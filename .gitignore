@@ -2,3 +2,4 @@
 .idea/
 instrumented-classes/
 target/
+*.log

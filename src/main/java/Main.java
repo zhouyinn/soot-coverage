@@ -1,7 +1,10 @@
 import soot.*;
 import soot.options.Options;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.*;
 
 public class Main {
@@ -15,24 +18,62 @@ public class Main {
     }
 
     public static void main(String[] args) {
-        if (args.length < 1) {
-            System.err.println("Usage: java Main <target-maven-project-path>");
+        if (args.length < 2) {
+            System.err.println("Usage: java Main <target-maven-project-path> <file-with-lines-to-instrument>");
             System.exit(1);
         }
 
         String targetProject = args[0];
+        String fileWithLinesToInstrument = args[1];
+
         System.out.println(">> Instrumenting project at: " + targetProject);
 
+        Map<String, Set<Integer>> linesToInstrument = readLinesFromFile(fileWithLinesToInstrument);
+        System.out.println(">> Using file for specific lines to instrument: " + linesToInstrument.toString());
+
+
         // Generate instrumented .class files
-        instrumentClasses(targetProject, "target/classes", "instrumented-classes", new ProductCodeTransformer(), Options.output_format_class);
+        instrumentClasses(targetProject, "target/classes", "instrumented-classes", new ProductCodeTransformer(linesToInstrument), Options.output_format_class);
         G.reset();
         instrumentClasses(targetProject, "target/test-classes", "instrumented-test-classes", new TestCodeTransformer(), Options.output_format_class);
         G.reset();
 
         // Generate Jimple output
-        instrumentClasses(targetProject, "target/classes", "jimple-out", new ProductCodeTransformer(), Options.output_format_jimple);
+        instrumentClasses(targetProject, "target/classes", "jimple-out", new ProductCodeTransformer(linesToInstrument), Options.output_format_jimple);
         G.reset();
         instrumentClasses(targetProject, "target/test-classes", "jimple-test-out", new TestCodeTransformer(), Options.output_format_jimple);
+    }
+
+    static Map<String, Set<Integer>> readLinesFromFile(String fileWithLinesToInstrument) {
+        Map<String, Set<Integer>> linesMap = new HashMap<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(fileWithLinesToInstrument))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] parts = line.split(":");
+                String filePath = parts[0].trim();
+                String[] lineNumbers = parts[1].trim().split(",");
+                Set<Integer> lineSet = new HashSet<>();
+
+                for (String lineNumber : lineNumbers) {
+                    if (lineNumber.contains("-")) {
+                        String[] rangeParts = lineNumber.split("-");
+                        for (int i = Integer.parseInt(rangeParts[0].trim()); i <= Integer.parseInt(rangeParts[1].trim()); i++) {
+                            lineSet.add(i);
+                        }
+                    } else {
+                        lineSet.add(Integer.parseInt(lineNumber.trim()));
+                    }
+                }
+
+                linesMap.merge(filePath, lineSet, (existingSet, newSet) -> {
+                    existingSet.addAll(newSet);
+                    return existingSet;
+                });
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return linesMap;
     }
 
     private static void instrumentClasses(String targetProjectPath, String inputSubdir, String outputSubdir, BodyTransformer transformer, int outputFormat) {
