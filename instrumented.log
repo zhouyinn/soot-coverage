@@ -1,0 +1,71 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< org.example:statement-coverage >-------------------
+[INFO] Building statement-coverage 1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ statement-coverage ---
+[WARNING] Using platform encoding (UTF-8 actually) to copy filtered resources, i.e. build is platform dependent!
+[INFO] skip non existing resourceDirectory /Users/yzhou29/git/trace/statement-coverage/src/main/resources
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ statement-coverage ---
+[INFO] Recompiling the module because of changed source code.
+[WARNING] File encoding has not been set, using platform encoding UTF-8, i.e. build is platform dependent!
+[INFO] Compiling 5 source files with javac [debug target 1.8] to target/classes
+[INFO] 
+[INFO] --- exec:3.1.0:java (default-cli) @ statement-coverage ---
+>> Instrumenting project at: ../checkstyle-8.35
+>>> Processing: ../checkstyle-8.35/target/classes
+>>> Output to: ../checkstyle-8.35/instrumented-classes
+>>> Full classpath: target/classes:../checkstyle-8.35/target/classes:../checkstyle-8.35/target/test-classes
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+=== Classes loaded by Soot ===
+  Main
+Instrumenting: <Main: void <init>()>
+Instrumenting: <Main$lambda_findClassDirs_0__1: java.util.function.Predicate bootstrap$()>
+Instrumenting: <Main$lambda_findClassDirs_1__2: java.util.function.Consumer bootstrap$(java.util.Set)>
+Instrumenting: <Main$lambda_findClassDirs_0__1: void <init>()>
+Instrumenting: <Main$lambda_findClassDirs_1__2: void <init>(java.util.Set)>
+Instrumenting: <Main$lambda_findClassDirs_0__1: boolean test(java.lang.Object)>
+Instrumenting: <Main: java.lang.String getFullClassPath(java.lang.String)>
+Instrumenting: <Main$lambda_findClassDirs_1__2: void accept(java.lang.Object)>
+Instrumenting: <Main: void main(java.lang.String[])>
+Instrumenting: <Main: void instrumentClasses(java.lang.String,java.lang.String,java.lang.String,soot.BodyTransformer,int)>
+Instrumenting: <Main: java.util.List findClassDirs(java.lang.String)>
+Instrumenting: <Main: void lambda$findClassDirs$1(java.util.Set,java.nio.file.Path)>
+Instrumenting: <Main: boolean lambda$findClassDirs$0(java.nio.file.Path)>
+>>> Processing: ../checkstyle-8.35/target/test-classes
+>>> Output to: ../checkstyle-8.35/instrumented-test-classes
+>>> Full classpath: target/classes:../checkstyle-8.35/target/classes:../checkstyle-8.35/target/test-classes
+[WARNING] 
+java.lang.RuntimeException: Error: couldn't find class: com.puppycrawl.tools.checkstyle.checks.outertypefilename.InputOuterTypeFilename1a are the packages set properly?
+    at soot.JastAddInitialResolver.resolveFromJavaFile (JastAddInitialResolver.java:119)
+    at soot.JavaClassSource.resolve (JavaClassSource.java:67)
+    at soot.SootResolver.bringToHierarchyUnchecked (SootResolver.java:271)
+    at soot.SootResolver.bringToHierarchy (SootResolver.java:240)
+    at soot.SootResolver.bringToSignatures (SootResolver.java:310)
+    at soot.SootResolver.processResolveWorklist (SootResolver.java:195)
+    at soot.SootResolver.resolveClass (SootResolver.java:152)
+    at soot.Scene.loadClass (Scene.java:1004)
+    at soot.Scene.loadClassAndSupport (Scene.java:991)
+    at soot.Scene.loadNecessaryClasses (Scene.java:1820)
+    at Main.instrumentClasses (Main.java:75)
+    at Main.main (Main.java:31)
+    at org.codehaus.mojo.exec.ExecJavaMojo$1.run (ExecJavaMojo.java:279)
+    at java.lang.Thread.run (Thread.java:750)
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  2.653 s
+[INFO] Finished at: 2025-04-22T22:09:34-04:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.codehaus.mojo:exec-maven-plugin:3.1.0:java (default-cli) on project statement-coverage: An exception occurred while executing the Java class. Error: couldn't find class: com.puppycrawl.tools.checkstyle.checks.outertypefilename.InputOuterTypeFilename1a are the packages set properly? -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException

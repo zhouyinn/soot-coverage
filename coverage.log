@@ -1,9 +1,0 @@
-<Hello: void <clinit>()>:2 → JAssignStmt <Hello: java.lang.String hello1> = "Hello"
-<Hello: void <clinit>()>:3 → JAssignStmt <Hello: java.lang.String hello2> = "Hello"
-<Hello: void <clinit>()>:3 → JReturnVoidStmt return
-<Hello: void main(java.lang.String[])>:7 → JAssignStmt $r2 = <java.lang.System: java.io.PrintStream out>
-<Hello: void main(java.lang.String[])>:7 → JInvokeStmt virtualinvoke $r2.<java.io.PrintStream: void println(java.lang.String)>("Positive")
-<Hello: void main(java.lang.String[])>:7 → JGotoStmt goto [?= $r1 = <java.lang.System: java.io.PrintStream out>]
-<Hello: void main(java.lang.String[])>:11 → JAssignStmt $r1 = <java.lang.System: java.io.PrintStream out>
-<Hello: void main(java.lang.String[])>:11 → JInvokeStmt virtualinvoke $r1.<java.io.PrintStream: void println(java.lang.String)>("Done.")
-<Hello: void main(java.lang.String[])>:13 → JReturnVoidStmt return
