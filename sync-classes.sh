@@ -1,8 +1,14 @@
 #!/bin/bash
 
-echo "⚙️  Overwriting original class files with instrumented ones (only existing files)..."
+# Ensure a project path is passed as an argument
+if [ -z "$1" ]; then
+  echo "⚠️  Please provide the target project path as an argument."
+  echo "Usage: $0 <target-project-path>"
+  exit 1
+fi
 
-PROJ="../demo-project"
+# Define the target project from input argument
+PROJ=$1
 SRC_CLASSES="$PROJ/instrumented-classes"
 SRC_TEST_CLASSES="$PROJ/instrumented-test-classes"
 DST_CLASSES="$PROJ/target/classes"
@@ -23,6 +29,8 @@ copy_matching_classes() {
   done
 }
 
+# Copy instrumented classes to destination project
+echo "⚙️  Overwriting original class files with instrumented ones..."
 copy_matching_classes "$SRC_CLASSES" "$DST_CLASSES"
 copy_matching_classes "$SRC_TEST_CLASSES" "$DST_TEST_CLASSES"
 
