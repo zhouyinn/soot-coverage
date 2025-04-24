@@ -10,26 +10,14 @@ public class Logger {
 
     public static synchronized void log(String id) {
         statements.add(id);
+        flush();
     }
 
     static {
         Runtime.getRuntime().addShutdownHook(new Thread(Logger::flush));
     }
 
-    public static synchronized void logInt(String label, int val) {
-        statements.add(label + " = " + val);
-    }
-
-    public static synchronized void logBoolean(String label, boolean val) {
-        statements.add(label + " = " + val);
-    }
-
-    public static synchronized void logObject(String label, Object val) {
-        statements.add(label + " = " + String.valueOf(val));
-    }
-
     public static synchronized void flush() {
-        System.out.println("Flushing " + statements.size() + " statements");
         try (FileWriter fw = new FileWriter("coverage.log", true)) {
             for (String s : statements) {
                 fw.write(s + "\n");
@@ -40,4 +28,17 @@ public class Logger {
             e.printStackTrace();
         }
     }
+
+    public static void log(String key, int value) {
+        System.out.println(key + " = " + value);
+    }
+
+    public static void log(String key, boolean value) {
+        System.out.println(key + " = " + value);
+    }
+
+    public static void log(String key, Object value) {
+        System.out.println(key + " = " + value);
+    }
+
 }
