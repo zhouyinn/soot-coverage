@@ -34,14 +34,6 @@ public class Main {
 
         // Generate instrumented .class files
         instrumentClasses(targetProject, "target/classes", "instrumented-classes", new ProductCodeTransformer(linesToInstrument), Options.output_format_class);
-        G.reset();
-        instrumentClasses(targetProject, "target/test-classes", "instrumented-test-classes", new TestCodeTransformer(), Options.output_format_class);
-        G.reset();
-
-        // Generate Jimple output
-        instrumentClasses(targetProject, "target/classes", "jimple-out", new ProductCodeTransformer(linesToInstrument), Options.output_format_jimple);
-        G.reset();
-        instrumentClasses(targetProject, "target/test-classes", "jimple-test-out", new TestCodeTransformer(), Options.output_format_jimple);
     }
 
     static Map<String, Set<Integer>> readLinesFromFile(String fileWithLinesToInstrument) {
