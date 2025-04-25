@@ -24,28 +24,30 @@ public class ProductCodeTransformer extends BodyTransformer {
         if (linesToProcess == null) return;
 
         List<Unit> safeUnits = new ArrayList<>(body.getUnits());
-        for (Unit stmt : safeUnits) {
-            if (!(stmt instanceof Stmt)) continue;
-            int line = stmt.getJavaSourceStartLineNumber();
-            if (line <= 0 || !linesToProcess.contains(line)) continue;
+        safeUnits.stream()
+                .filter(stmt -> stmt instanceof Stmt)
+                .filter(stmt -> {
+                    int line = stmt.getJavaSourceStartLineNumber();
+                    return line > 0 && linesToProcess.contains(line);
+                })
+                .forEach(stmt -> {
+                    if (stmt instanceof AssignStmt) {
+                        AssignStmt assign = (AssignStmt) stmt;
+                        String logText = assign.getLeftOp() + " = " + assign.getRightOp();
+                        InvokeExpr logExpr = Jimple.v().newStaticInvokeExpr(logMethod.makeRef(), StringConstant.v(logText));
+                        Unit logStmt = Jimple.v().newInvokeStmt(logExpr);
+                        body.getUnits().insertBefore(logStmt, stmt);
+                    }
 
-            if (stmt instanceof AssignStmt) {
-                AssignStmt assign = (AssignStmt) stmt;
-                String logText = assign.getLeftOp() + " = " + assign.getRightOp();
-                InvokeExpr logExpr = Jimple.v().newStaticInvokeExpr(logMethod.makeRef(), StringConstant.v(logText));
-                Unit logStmt = Jimple.v().newInvokeStmt(logExpr);
-                body.getUnits().insertBefore(logStmt, stmt);
-            }
-
-            if (stmt instanceof IfStmt) {
-                IfStmt ifStmt = (IfStmt) stmt;
-                Value newCond = ConditionInstrumenter.instrument(
-                        ifStmt.getCondition(), stmt, units, body, logMethod);
-                if (newCond instanceof ConditionExpr) {
-                    ifStmt.setCondition((ConditionExpr) newCond);
-                }
-            }
-        }
+                    if (stmt instanceof IfStmt) {
+                        IfStmt ifStmt = (IfStmt) stmt;
+                        Value newCond = ConditionInstrumenter.instrument(
+                                ifStmt.getCondition(), stmt, units, body, logMethod);
+                        if (newCond instanceof ConditionExpr) {
+                            ifStmt.setCondition((ConditionExpr) newCond);
+                        }
+                    }
+                });
     }
 
     private Set<Integer> findInstrumentedLines(String className) {

@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.IntStream;
 
 public class Main {
 //    static String rtJar = "/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/jre/lib/rt.jar";
@@ -32,7 +33,7 @@ public class Main {
         System.out.println(">> Using file for specific lines to instrument: " + linesToInstrument.toString());
 
 
-//         Generate instrumented .class files
+        //  Generate instrumented .class files
         instrumentClasses(targetProject, "target/classes", "instrumented-classes", new ProductCodeTransformer(linesToInstrument), Options.output_format_class);
         G.reset();
         instrumentClasses(targetProject, "target/test-classes", "instrumented-test-classes", new TestCodeTransformer(), Options.output_format_class);
@@ -54,16 +55,18 @@ public class Main {
                 String[] lineNumbers = parts[1].trim().split(",");
                 Set<Integer> lineSet = new HashSet<>();
 
-                for (String lineNumber : lineNumbers) {
-                    if (lineNumber.contains("-")) {
-                        String[] rangeParts = lineNumber.split("-");
-                        for (int i = Integer.parseInt(rangeParts[0].trim()); i <= Integer.parseInt(rangeParts[1].trim()); i++) {
-                            lineSet.add(i);
-                        }
-                    } else {
-                        lineSet.add(Integer.parseInt(lineNumber.trim()));
-                    }
-                }
+                Arrays.stream(lineNumbers)
+                        .forEach(lineNumber -> {
+                            if (lineNumber.contains("-")) {
+                                String[] rangeParts = lineNumber.split("-");
+                                int start = Integer.parseInt(rangeParts[0].trim());
+                                int end = Integer.parseInt(rangeParts[1].trim());
+                                IntStream.rangeClosed(start, end)
+                                        .forEach(lineSet::add);
+                            } else {
+                                lineSet.add(Integer.parseInt(lineNumber.trim()));
+                            }
+                        });
 
                 linesMap.merge(filePath, lineSet, (existingSet, newSet) -> {
                     existingSet.addAll(newSet);
@@ -114,9 +117,9 @@ public class Main {
 
         // Debug print
         System.out.println("=== Classes loaded by Soot ===");
-        for (SootClass cls : Scene.v().getApplicationClasses()) {
-            System.out.println("  " + cls.getName());
-        }
+        Scene.v().getApplicationClasses().stream()
+                .map(SootClass::getName)
+                .forEach(name -> System.out.println("  " + name));
 
         // Run Soot and write output
         PackManager.v().runPacks();

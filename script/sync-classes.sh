@@ -31,7 +31,7 @@ copy_matching_classes() {
 
 # Copy instrumented classes to destination project
 echo "⚙️  Overwriting original class files with instrumented ones..."
-copy_matching_classes "$SRC_CLASSES" "$DST_CLASSES"
+#copy_matching_classes "$SRC_CLASSES" "$DST_CLASSES"
 copy_matching_classes "$SRC_TEST_CLASSES" "$DST_TEST_CLASSES"
 
 # ✅ Ensure Logger.class is copied from statement-coverage into the test runtime

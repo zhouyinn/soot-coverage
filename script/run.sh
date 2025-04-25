@@ -12,8 +12,8 @@ PROJECT_NAME=$1
 PROJECT_DIR="$ROOT_DIR/$PROJECT_NAME"
 
 # Step 1: Clean Soot (Run clean-soot.sh)
-echo "Cleaning Soot for project: $PROJECT_NAME"
-bash clean-soot.sh "$PROJECT_DIR" || { echo "Failed to clean Soot"; exit 1; }
+echo "Cleaning Soot for project: $PROJECT_DIR"
+bash script/clean-soot.sh "$PROJECT_DIR" || { echo "Failed to clean Soot"; exit 1; }
 
 # Step 2: Compile project
 echo "Compiling project: $PROJECT_NAME"
@@ -31,6 +31,6 @@ mvn clean compile exec:java -Dexec.args="$PROJECT_DIR $PROJECT_DIR/enforcing_sta
 
 # Step 4: Sync classes
 echo "Syncing classes with sync-classes.sh"
-bash sync-classes.sh "$PROJECT_DIR" || { echo "Failed to sync classes"; exit 1; }
+bash script/sync-classes.sh "$PROJECT_DIR" || { echo "Failed to sync classes"; exit 1; }
 
 echo "Process completed successfully."
