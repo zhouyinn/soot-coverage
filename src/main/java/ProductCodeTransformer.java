@@ -28,14 +28,18 @@ public class ProductCodeTransformer extends BodyTransformer {
 
         if (linesToProcess == null) return;
 
-        for (Iterator<Unit> it = units.snapshotIterator(); it.hasNext();) {
-            Stmt stmt = (Stmt) it.next();
+        List<Unit> safeUnits = new ArrayList<>(body.getUnits());
+        for (Unit stmt : safeUnits) {
+            if (!(stmt instanceof Stmt)) continue;
             int line = stmt.getJavaSourceStartLineNumber();
             if (line <= 0 || !linesToProcess.contains(line)) continue;
 
             if (stmt instanceof AssignStmt) {
                 AssignStmt assign = (AssignStmt) stmt;
-                logAssignmentExpr(assign, units, stmt, logMethod);
+                String logText = assign.getLeftOp() + " = " + assign.getRightOp();
+                InvokeExpr logExpr = Jimple.v().newStaticInvokeExpr(logMethod.makeRef(), StringConstant.v(logText));
+                Unit logStmt = Jimple.v().newInvokeStmt(logExpr);
+                body.getUnits().insertBefore(logStmt, stmt);
             }
 
             if (stmt instanceof IfStmt) {
