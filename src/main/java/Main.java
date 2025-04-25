@@ -32,16 +32,16 @@ public class Main {
         System.out.println(">> Using file for specific lines to instrument: " + linesToInstrument.toString());
 
 
-        // Generate instrumented .class files
+//         Generate instrumented .class files
         instrumentClasses(targetProject, "target/classes", "instrumented-classes", new ProductCodeTransformer(linesToInstrument), Options.output_format_class);
-//        G.reset();
-//        instrumentClasses(targetProject, "target/test-classes", "instrumented-test-classes", new TestCodeTransformer(), Options.output_format_class);
-//        G.reset();
-//
-//        // Generate Jimple output
-//        instrumentClasses(targetProject, "target/classes", "jimple-out", new ProductCodeTransformer(linesToInstrument), Options.output_format_jimple);
-//        G.reset();
-//        instrumentClasses(targetProject, "target/test-classes", "jimple-test-out", new TestCodeTransformer(), Options.output_format_jimple);
+        G.reset();
+        instrumentClasses(targetProject, "target/test-classes", "instrumented-test-classes", new TestCodeTransformer(), Options.output_format_class);
+        G.reset();
+
+        // Generate Jimple output
+        instrumentClasses(targetProject, "target/classes", "jimple-out", new ProductCodeTransformer(linesToInstrument), Options.output_format_jimple);
+        G.reset();
+        instrumentClasses(targetProject, "target/test-classes", "jimple-test-out", new TestCodeTransformer(), Options.output_format_jimple);
     }
 
     static Map<String, Set<Integer>> readLinesFromFile(String fileWithLinesToInstrument) {
@@ -96,6 +96,7 @@ public class Main {
         // Configure Soot
         Options.v().set_prepend_classpath(true);
         Options.v().set_soot_classpath(fullClasspath);
+        Options.v().set_src_prec(Options.src_prec_only_class);
         Scene.v().loadClassAndSupport("Logger").setLibraryClass();
         Options.v().set_process_dir(Collections.singletonList(inputDir));
         Options.v().set_output_dir(outputDir);
@@ -108,7 +109,6 @@ public class Main {
 
         // Register transformer
         PackManager.v().getPack("jtp").add(new Transform("jtp.instrument", transformer));
-
         // Load classes
         Scene.v().loadNecessaryClasses();
 
