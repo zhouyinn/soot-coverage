@@ -32,6 +32,12 @@ public class ProductCodeTransformer extends BodyTransformer {
             Stmt stmt = (Stmt) it.next();
             int line = stmt.getJavaSourceStartLineNumber();
             if (line <= 0 || !linesToProcess.contains(line)) continue;
+
+            if (stmt instanceof AssignStmt) {
+                AssignStmt assign = (AssignStmt) stmt;
+                logAssignmentExpr(assign, units, stmt, logMethod);
+            }
+
             if (stmt instanceof IfStmt) {
                 IfStmt ifStmt = (IfStmt) stmt;
                 Value newCond = ConditionInstrumenter.instrument(
@@ -55,6 +61,15 @@ public class ProductCodeTransformer extends BodyTransformer {
                 .orElse(null);
     }
 
+
+    private void logAssignmentExpr(AssignStmt assign, Chain<Unit> units, Unit anchor, SootMethod logMethod) {
+        Value lhs = assign.getLeftOp();
+        Value rhs = assign.getRightOp();
+
+        String logText = lhs.toString() + " = " + rhs.toString();
+        InvokeExpr logExpr = Jimple.v().newStaticInvokeExpr(logMethod.makeRef(), StringConstant.v(logText));
+        units.insertBefore(Jimple.v().newInvokeStmt(logExpr), anchor);
+    }
 
 
 
