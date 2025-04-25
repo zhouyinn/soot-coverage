@@ -11,8 +11,7 @@ import java.util.function.IntSupplier;
 public class InstrumentationUtil {
 
     static void insertRuntimeLog(Value val, Chain<Unit> units, Unit anchor,
-                                         Body body, SootMethod logMethod,
-                                         Map<Value, Local> tempCache, IntSupplier tempCounter) {
+                                         Body body, SootMethod logMethod) {
         if (!(val instanceof Local)) return;
 
         Local local = (Local) val;

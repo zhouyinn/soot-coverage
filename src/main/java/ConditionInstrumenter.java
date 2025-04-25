@@ -3,22 +3,23 @@ import soot.jimple.*;
 import soot.util.Chain;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntSupplier;
 
 public class ConditionInstrumenter {
+    private static final AtomicInteger counter = new AtomicInteger(1);
 
-    public static Value instrument(Value cond, Unit anchor, Chain<Unit> units, Body body, SootMethod logMethod,
-                                   Map<Value, Local> tempCache, IntSupplier tempCounter) {
+    public static Value instrument(Value cond, Unit anchor, Chain<Unit> units, Body body, SootMethod logMethod) {
         if (cond instanceof InvokeExpr || cond instanceof Local || cond instanceof Constant) {
-            return getOrCreateTemp(cond, anchor, units, body, logMethod, tempCache, tempCounter);
+            return getOrCreateTemp(cond, anchor, units, body);
         }
 
         if (cond instanceof BinopExpr) {
-            return handleBinaryExpr((BinopExpr) cond, anchor, units, body, logMethod, tempCache, tempCounter);
+            return handleBinaryExpr((BinopExpr) cond, anchor, units, logMethod, body);
         }
 
         if (cond instanceof UnopExpr) {
-            Value operand = instrument(((UnopExpr) cond).getOp(), anchor, units, body, logMethod, tempCache, tempCounter);
+            Value operand = instrument(((UnopExpr) cond).getOp(), anchor, units, body, logMethod);
             if (cond instanceof NegExpr) {
                 return Jimple.v().newNegExpr(operand);
             } else {
@@ -29,12 +30,11 @@ public class ConditionInstrumenter {
         throw new RuntimeException("Unsupported condition type: " + cond.getClass());
     }
 
-    private static Value handleBinaryExpr(BinopExpr binop, Unit anchor, Chain<Unit> units, Body body,
-                                          SootMethod logMethod, Map<Value, Local> tempCache, IntSupplier tempCounter) {
-        Value left = getOrCreateTemp(binop.getOp1(), anchor, units, body, logMethod, tempCache, tempCounter);
-        Value right = getOrCreateTemp(binop.getOp2(), anchor, units, body, logMethod, tempCache, tempCounter);
+    private static Value handleBinaryExpr(BinopExpr binop, Unit anchor, Chain<Unit> units, SootMethod logMethod, Body body) {
+        Value left = getOrCreateTemp(binop.getOp1(), anchor, units, body);
+        Value right = getOrCreateTemp(binop.getOp2(), anchor, units, body);
 
-        logCondition(left, right, binop.getSymbol(), units, anchor, logMethod, tempCache, body, tempCounter);
+        logCondition(left, right, binop.getSymbol(), units, anchor, logMethod, body);
 
         if (binop instanceof LtExpr) return Jimple.v().newLtExpr(left, right);
         if (binop instanceof LeExpr) return Jimple.v().newLeExpr(left, right);
@@ -58,32 +58,21 @@ public class ConditionInstrumenter {
         throw new RuntimeException("Unsupported BinopExpr: " + binop.getClass());
     }
 
-    private static Local getOrCreateTemp(Value expr, Unit anchor, Chain<Unit> units, Body body, SootMethod logMethod,
-                                         Map<Value, Local> tempCache, IntSupplier tempCounter) {
-        if (tempCache.containsKey(expr)) return tempCache.get(expr);
+    private static Local getOrCreateTemp(Value expr, Unit anchor, Chain<Unit> units, Body body) {
 
-        if (expr instanceof Local) {
-            tempCache.put(expr, (Local) expr);  // cache it to avoid future duplication
-            return (Local) expr;
-        }
-
-        Local temp = Jimple.v().newLocal("__autogen" + tempCounter.getAsInt(), expr.getType());
+        Local temp = Jimple.v().newLocal("__autogen" + counter.getAndIncrement(), expr.getType());
         body.getLocals().add(temp);
         units.insertBefore(Jimple.v().newAssignStmt(temp, expr), anchor);
-
-        tempCache.put(expr, temp);
         return temp;
     }
 
     private static void logCondition(Value left, Value right, String op,
                                      Chain<Unit> units, Unit anchor,
-                                     SootMethod logMethod,
-                                     Map<Value, Local> tempCache,
-                                     Body body, IntSupplier tempCounter) {
+                                     SootMethod logMethod, Body body) {
 
         // Ensure values are logged
-        InstrumentationUtil.insertRuntimeLog(left, units, anchor, body, logMethod, tempCache, tempCounter);
-        InstrumentationUtil.insertRuntimeLog(right, units, anchor, body, logMethod, tempCache, tempCounter);
+        InstrumentationUtil.insertRuntimeLog(left, units, anchor, body, logMethod);
+        InstrumentationUtil.insertRuntimeLog(right, units, anchor, body, logMethod);
 
         // Then log the comparison
         String msg = "Condition: " + left + " " + op + " " + right;

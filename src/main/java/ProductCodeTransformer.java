@@ -1,15 +1,10 @@
 import soot.*;
 import soot.jimple.*;
-import soot.jimple.internal.*;
-import soot.util.Chain;
 
 import java.util.*;
 
 public class ProductCodeTransformer extends BodyTransformer {
     private final Map<String, Set<Integer>> linesToInstrument;
-    private final Map<Value, Local> tempCache = new HashMap<>();
-    private int tempCounter = 1;
-
     public ProductCodeTransformer(Map<String, Set<Integer>> linesToInstrument) {
         this.linesToInstrument = linesToInstrument;
     }
@@ -45,15 +40,12 @@ public class ProductCodeTransformer extends BodyTransformer {
             if (stmt instanceof IfStmt) {
                 IfStmt ifStmt = (IfStmt) stmt;
                 Value newCond = ConditionInstrumenter.instrument(
-                        ifStmt.getCondition(), stmt, units, body, logMethod, tempCache, this::nextTemp);
+                        ifStmt.getCondition(), stmt, units, body, logMethod);
                 if (newCond instanceof ConditionExpr) {
                     ifStmt.setCondition((ConditionExpr) newCond);
                 }
             }
         }
-    }
-    private int nextTemp() {
-        return tempCounter++;
     }
 
     private Set<Integer> findInstrumentedLines(String className) {
@@ -63,16 +55,6 @@ public class ProductCodeTransformer extends BodyTransformer {
                 .map(Map.Entry::getValue)
                 .findFirst()
                 .orElse(null);
-    }
-
-
-    private void logAssignmentExpr(AssignStmt assign, Chain<Unit> units, Unit anchor, SootMethod logMethod) {
-        Value lhs = assign.getLeftOp();
-        Value rhs = assign.getRightOp();
-
-        String logText = lhs.toString() + " = " + rhs.toString();
-        InvokeExpr logExpr = Jimple.v().newStaticInvokeExpr(logMethod.makeRef(), StringConstant.v(logText));
-        units.insertBefore(Jimple.v().newInvokeStmt(logExpr), anchor);
     }
 
 
