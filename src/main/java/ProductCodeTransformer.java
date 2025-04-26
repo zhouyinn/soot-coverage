@@ -3,6 +3,11 @@ import soot.jimple.*;
 
 import java.util.*;
 
+class LineCounter {
+    int currentLine = -1;
+    int subconditionCounter = 1;
+}
+
 public class ProductCodeTransformer extends BodyTransformer {
     private final Map<String, Set<Integer>> linesToInstrument;
     private static final Set<Integer> linesLogged = new HashSet<>();
@@ -24,6 +29,7 @@ public class ProductCodeTransformer extends BodyTransformer {
 
         List<Unit> safeUnits = new ArrayList<>(body.getUnits());
         SootMethod logMethod = Scene.v().getMethod("<Logger: void log(java.lang.String)>");
+        LineCounter counter = new LineCounter();
         safeUnits.stream()
                 .filter(stmt -> {
                     int line = stmt.getJavaSourceStartLineNumber();
@@ -31,6 +37,11 @@ public class ProductCodeTransformer extends BodyTransformer {
                 })
                 .forEach(stmt -> {
                     int line = stmt.getJavaSourceStartLineNumber();
+                    if (counter.currentLine != line) {
+                        counter.currentLine = line;
+                        counter.subconditionCounter = 1;
+                    }
+
                     if (!linesLogged.contains(line)) {
                         insertLineExercisedLog(stmt, body.getUnits(), body, logMethod);
                         linesLogged.add(line);
@@ -38,11 +49,20 @@ public class ProductCodeTransformer extends BodyTransformer {
 
                     if (stmt instanceof IfStmt) {
                         IfStmt ifStmt = (IfStmt) stmt;
+
+                        // 1. Insert SUBCONDITION_CHECKED log
+                        ConditionInstrumenter.insertSubconditionCheckedLog(counter.subconditionCounter, stmt, body.getUnits(), body, logMethod);
+
+                        // 2. Instrument the condition
                         Value newCond = ConditionInstrumenter.instrument(
-                                ifStmt.getCondition(), stmt, body.getUnits(), body, logMethod);
+                                ifStmt.getCondition(), stmt, body.getUnits(), body, logMethod
+                        );
                         if (newCond instanceof ConditionExpr) {
                             ifStmt.setCondition((ConditionExpr) newCond);
                         }
+
+                        // 5. Increment subconditionCounter
+                        counter.subconditionCounter++;
                     }
                 });
     }

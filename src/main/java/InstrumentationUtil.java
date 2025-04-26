@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class InstrumentationUtil {
     static final AtomicInteger counter = new AtomicInteger(1);
+    public static boolean DEBUG_MODE = false; // true = verbose, false = minimal
 
     public static Local createTempForValue(Value original, String eventType, Chain<Unit> units, Unit anchor,
                                            Body body, SootMethod logMethod) {
@@ -27,6 +28,7 @@ public class InstrumentationUtil {
 
     public static void insertRuntimeLog(Local local, boolean isConstant, String eventType, Chain<Unit> units, Unit anchor,
                                          Body body, SootMethod logMethod) {
+        if (!InstrumentationUtil.DEBUG_MODE) return;
         Type type = local.getType();
         SootMethod valueOfMethod = InstrumentationUtil.getStringValueOfMethodForType(type);
 
