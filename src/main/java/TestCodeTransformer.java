@@ -2,7 +2,8 @@ import soot.*;
 import soot.jimple.*;
 import soot.util.Chain;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Map;
 
 public class TestCodeTransformer extends BodyTransformer {
 
@@ -20,17 +21,26 @@ public class TestCodeTransformer extends BodyTransformer {
         System.out.println("Injecting Logger.log() into " + method.getSignature());
 
         PatchingChain<Unit> units = body.getUnits();
-        Unit first = units.getFirst();
-
-        // Inject Logger.log("=== START TEST: ... ===") at the beginning
         SootMethod logMethod = Scene.v().getMethod("<Logger: void log(java.lang.String)>");
-        String startMessage = "=== START TEST: " + method.getSignature() + " ===";
 
-        units.insertBefore(
-                Jimple.v().newInvokeStmt(
-                        Jimple.v().newStaticInvokeExpr(logMethod.makeRef(), StringConstant.v(startMessage))
-                ),
-                first
+        String startMessage = "=== START TEST: " + method.getSignature() + " ===";
+        String endMessage = "=== END TEST: " + method.getSignature() + " ===";
+
+        // Inject START log at the beginning
+        Unit first = units.getFirst();
+        Unit startLog = Jimple.v().newInvokeStmt(
+                Jimple.v().newStaticInvokeExpr(logMethod.makeRef(), StringConstant.v(startMessage))
         );
+        units.insertBefore(startLog, first);
+
+        // Inject END log before return or return-void statements
+        new ArrayList<>(units).stream()
+                .filter(u -> u instanceof ReturnStmt || u instanceof ReturnVoidStmt)
+                .forEach(u -> {
+                    Unit endLog = Jimple.v().newInvokeStmt(
+                            Jimple.v().newStaticInvokeExpr(logMethod.makeRef(), StringConstant.v(endMessage))
+                    );
+                    units.insertBefore(endLog, u);
+                });
     }
 }

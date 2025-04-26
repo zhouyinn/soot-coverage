@@ -5,6 +5,7 @@ import java.util.*;
 
 public class ProductCodeTransformer extends BodyTransformer {
     private final Map<String, Set<Integer>> linesToInstrument;
+    private static final Set<Integer> linesLogged = new HashSet<>();
     public ProductCodeTransformer(Map<String, Set<Integer>> linesToInstrument) {
         this.linesToInstrument = linesToInstrument;
     }
@@ -17,32 +18,28 @@ public class ProductCodeTransformer extends BodyTransformer {
 
         System.out.println("Instrumenting: " + body.getMethod().getSignature());
 
-        PatchingChain<Unit> units = body.getUnits();
-        SootMethod logMethod = Scene.v().getMethod("<Logger: void log(java.lang.String)>");
         Set<Integer> linesToProcess = findInstrumentedLines(className);
 
         if (linesToProcess == null) return;
 
         List<Unit> safeUnits = new ArrayList<>(body.getUnits());
+        SootMethod logMethod = Scene.v().getMethod("<Logger: void log(java.lang.String)>");
         safeUnits.stream()
-                .filter(stmt -> stmt instanceof Stmt)
                 .filter(stmt -> {
                     int line = stmt.getJavaSourceStartLineNumber();
                     return line > 0 && linesToProcess.contains(line);
                 })
                 .forEach(stmt -> {
-                    if (stmt instanceof AssignStmt) {
-                        AssignStmt assign = (AssignStmt) stmt;
-                        String logText = assign.getLeftOp() + " = " + assign.getRightOp();
-                        InvokeExpr logExpr = Jimple.v().newStaticInvokeExpr(logMethod.makeRef(), StringConstant.v(logText));
-                        Unit logStmt = Jimple.v().newInvokeStmt(logExpr);
-                        body.getUnits().insertBefore(logStmt, stmt);
+                    int line = stmt.getJavaSourceStartLineNumber();
+                    if (!linesLogged.contains(line)) {
+                        insertLineExercisedLog(stmt, body.getUnits(), body, logMethod);
+                        linesLogged.add(line);
                     }
 
                     if (stmt instanceof IfStmt) {
                         IfStmt ifStmt = (IfStmt) stmt;
                         Value newCond = ConditionInstrumenter.instrument(
-                                ifStmt.getCondition(), stmt, units, body, logMethod);
+                                ifStmt.getCondition(), stmt, body.getUnits(), body, logMethod);
                         if (newCond instanceof ConditionExpr) {
                             ifStmt.setCondition((ConditionExpr) newCond);
                         }
@@ -57,6 +54,19 @@ public class ProductCodeTransformer extends BodyTransformer {
                 .map(Map.Entry::getValue)
                 .findFirst()
                 .orElse(null);
+    }
+
+    private static void insertLineExercisedLog(Unit stmt, PatchingChain<Unit> units, Body body, SootMethod logMethod) {
+        String sourceFile = body.getMethod().getDeclaringClass().getShortName() + ".java"; // or add package if you want
+        int line = stmt.getJavaSourceStartLineNumber();
+        String message = "{\"event\":\"EXERCISED\",\"file\":\"" + sourceFile + "\",\"line\":\"" + line + "\"}";
+        InvokeExpr invokeExpr = Jimple.v().newStaticInvokeExpr(
+                logMethod.makeRef(),
+                StringConstant.v(message)
+        );
+
+        InvokeStmt invokeStmt = Jimple.v().newInvokeStmt(invokeExpr);
+        units.insertBefore(invokeStmt, stmt);
     }
 
 

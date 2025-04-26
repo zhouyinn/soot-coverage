@@ -7,38 +7,62 @@ import java.util.List;
 
 public class Logger {
     private static final List<String> statements = Collections.synchronizedList(new ArrayList<>());
-
-    public static synchronized void log(String id) {
-        statements.add(id);
-        flush();
-    }
+    private static final int FLUSH_THRESHOLD = 1000; // Flush every 1000 logs
 
     static {
         Runtime.getRuntime().addShutdownHook(new Thread(Logger::flush));
     }
 
-    public static synchronized void flush() {
-        try (FileWriter fw = new FileWriter("coverage.log", true)) {
-            for (String s : statements) {
-                fw.write(s + "\n");
+    public static void log(String id) {
+        synchronized (statements) {
+            statements.add(id);
+            if (statements.size() >= FLUSH_THRESHOLD) {
+                flush();
             }
-            fw.flush();
-            statements.clear();
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
+    public static void flush() {
+        synchronized (statements) {
+            if (statements.isEmpty()) return;
+            try (FileWriter fw = new FileWriter("coverage.log", true);
+                 PrintWriter pw = new PrintWriter(fw)) {
+                for (String s : statements) {
+                    pw.println(s);
+                }
+                statements.clear();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    // Overloaded log methods for primitives
     public static void log(String key, int value) {
-        System.out.println(key + " = " + value);
+        log(key + " = " + value);
     }
 
     public static void log(String key, boolean value) {
-        System.out.println(key + " = " + value);
+        log(key + " = " + value);
+    }
+
+    public static void log(String key, long value) {
+        log(key + " = " + value);
+    }
+
+    public static void log(String key, float value) {
+        log(key + " = " + value);
+    }
+
+    public static void log(String key, double value) {
+        log(key + " = " + value);
+    }
+
+    public static void log(String key, char value) {
+        log(key + " = " + value);
     }
 
     public static void log(String key, Object value) {
-        System.out.println(key + " = " + value);
+        log(key + " = " + value);
     }
-
 }

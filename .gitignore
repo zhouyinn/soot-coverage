@@ -3,3 +3,4 @@
 instrumented-classes/
 target/
 *.log
+*.json

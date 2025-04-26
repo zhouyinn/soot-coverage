@@ -2,40 +2,28 @@ import soot.*;
 import soot.jimple.*;
 import soot.util.Chain;
 
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.IntSupplier;
-
 public class ConditionInstrumenter {
-    private static final AtomicInteger counter = new AtomicInteger(1);
-
     public static Value instrument(Value cond, Unit anchor, Chain<Unit> units, Body body, SootMethod logMethod) {
-        if (cond instanceof InvokeExpr || cond instanceof Local || cond instanceof Constant) {
-            return getOrCreateTemp(cond, anchor, units, body);
-        }
-
         if (cond instanceof BinopExpr) {
-            return handleBinaryExpr((BinopExpr) cond, anchor, units, logMethod, body);
+            return handleBinaryExpr((BinopExpr) cond, anchor, units, body, logMethod);
         }
 
         if (cond instanceof UnopExpr) {
-            Value operand = instrument(((UnopExpr) cond).getOp(), anchor, units, body, logMethod);
-            if (cond instanceof NegExpr) {
-                return Jimple.v().newNegExpr(operand);
-            } else {
-                return Jimple.v().newEqExpr(operand, IntConstant.v(0));
-            }
+            return handleUnopExpr((UnopExpr) cond, anchor, units, body, logMethod);
         }
 
         throw new RuntimeException("Unsupported condition type: " + cond.getClass());
     }
 
-    private static Value handleBinaryExpr(BinopExpr binop, Unit anchor, Chain<Unit> units, SootMethod logMethod, Body body) {
-        Value left = getOrCreateTemp(binop.getOp1(), anchor, units, body);
-        Value right = getOrCreateTemp(binop.getOp2(), anchor, units, body);
+    private static Value handleBinaryExpr(BinopExpr binop, Unit anchor, Chain<Unit> units, Body body, SootMethod logMethod) {
+        // (1) create temp locals
+        Local left = InstrumentationUtil.createTempForValue(binop.getOp1(), "left", units, anchor, body, logMethod);
+        Local right = InstrumentationUtil.createTempForValue(binop.getOp2(), "right", units, anchor, body, logMethod);
 
+        // (2) log the condition using the temps
         logCondition(left, right, binop.getSymbol(), units, anchor, logMethod, body);
 
+        // (3) rebuild the condition using the temps
         if (binop instanceof LtExpr) return Jimple.v().newLtExpr(left, right);
         if (binop instanceof LeExpr) return Jimple.v().newLeExpr(left, right);
         if (binop instanceof GtExpr) return Jimple.v().newGtExpr(left, right);
@@ -58,26 +46,33 @@ public class ConditionInstrumenter {
         throw new RuntimeException("Unsupported BinopExpr: " + binop.getClass());
     }
 
-    private static Local getOrCreateTemp(Value expr, Unit anchor, Chain<Unit> units, Body body) {
+    private static Value handleUnopExpr(UnopExpr unop, Unit anchor, Chain<Unit> units, Body body, SootMethod logMethod) {
+        Value operand = instrument(unop.getOp(), anchor, units, body, logMethod);
 
-        Local temp = Jimple.v().newLocal("__autogen" + counter.getAndIncrement(), expr.getType());
-        body.getLocals().add(temp);
-        units.insertBefore(Jimple.v().newAssignStmt(temp, expr), anchor);
-        return temp;
+        if (unop instanceof NegExpr) {
+            return Jimple.v().newNegExpr(operand);
+        } else {
+            // Assume logical negation like !x
+            return Jimple.v().newEqExpr(operand, IntConstant.v(0));
+        }
     }
 
-    private static void logCondition(Value left, Value right, String op,
+    private static void logCondition(Local left, Local right, String op,
                                      Chain<Unit> units, Unit anchor,
                                      SootMethod logMethod, Body body) {
+        if (left == null || right == null) return;
+        String className = body.getMethod().getDeclaringClass().getName().replace('.', '/');
+        int line = anchor.getJavaSourceStartLineNumber();
 
-        // Ensure values are logged
-        InstrumentationUtil.insertRuntimeLog(left, units, anchor, body, logMethod);
-        InstrumentationUtil.insertRuntimeLog(right, units, anchor, body, logMethod);
+        String msg = String.format(
+                "{\"event\":\"CONDITION\",\"file\":\"%s.java\",\"line\":\"%d\",\"OP_left\":\"%s\",\"operator\":\"%s\",\"OP_right\":\"%s\"}",
+                className, line, left.getName(), op, right.getName()
+        );
 
-        // Then log the comparison
-        String msg = "Condition: " + left + " " + op + " " + right;
         units.insertBefore(
-                Jimple.v().newInvokeStmt(Jimple.v().newStaticInvokeExpr(logMethod.makeRef(), StringConstant.v(msg))),
+                Jimple.v().newInvokeStmt(
+                        Jimple.v().newStaticInvokeExpr(logMethod.makeRef(), StringConstant.v(msg))
+                ),
                 anchor
         );
     }
