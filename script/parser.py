@@ -1,145 +1,70 @@
-import re
 import json
 from collections import defaultdict
 
-def parse_test_blocks(log_path):
-    result = {}
-    current_test_id = None
-    current_conditions = []
-    buffer_context = []
-    pending_lines = []
+def parse_coverage_log_better(input_log_path, output_json_path):
+    with open(input_log_path, 'r') as f:
+        lines = [line.strip() for line in f if line.strip()]
 
-    with open(log_path, 'r') as f:
-        for line in f:
-            line = line.strip()
+    location_map = defaultdict(lambda: {"exercised": [], "subconditions": defaultdict(list)})
 
-            if line.startswith("=== START TEST:"):
-                match = re.search(r"<(.*?): void (.*?)\(\)>", line)
-                if match:
-                    class_name, method_name = match.groups()
-                    current_test_id = f"{class_name}#{method_name}"
-                    current_conditions = []
-                    buffer_context = []
-                    pending_lines = []
+    current_test = None
 
-            elif line.startswith("=== END TEST:"):
-                pending_lines = []
-                buffer_context = []
-                if current_test_id and current_conditions:
-                    result[current_test_id] = current_conditions
-                current_test_id = None
-                current_conditions = []
+    for line in lines:
+        if line.startswith("=== START TEST:"):
+            start_idx = line.find('<')
+            end_idx = line.find('>')
+            if start_idx != -1 and end_idx != -1:
+                full_test_id = line[start_idx + 1:end_idx]
+                current_test = full_test_id.split(":")[-1].strip()
+        elif line.startswith("=== END TEST:"):
+            current_test = None
+        elif current_test is not None:
+            if '"event":"EXERCISED"' in line:
+                file = extract_between(line, '"file":"', '"')
+                lineno = extract_between(line, '"line":"', '"')
+                location = f"{file}:{lineno}"
+                location_map[location]["exercised"].append(current_test)
+            elif '"event":"SUBCONDITION_CHECKED"' in line:
+                file = extract_between(line, '"file":"', '"')
+                lineno = extract_between(line, '"line":"', '"')
+                index = extract_between(line, '"index":', '}').replace('"', '').strip()
+                location = f"{file}:{lineno}"
+                location_map[location]["subconditions"][index].append(current_test)
 
-            elif '[' in line and 'Condition:' in line and current_test_id:
-                location_match = re.search(r'\[(.*?)\]', line)
-                condition_match = re.search(r'Condition:\s*(.*)', line)
 
-                if location_match and condition_match:
-                    location = location_match.group(1)
-                    raw_condition = condition_match.group(1)
-
-                    # 1. Build variable values from pending_lines
-                    variable_values = build_variable_values(pending_lines)
-
-                    # 2. Substitute into the raw condition
-                    resolved_condition = substitute_variables(raw_condition, variable_values)
-
-                    # 3. Try to evaluate result
-                    try:
-                        result_value = eval(resolved_condition)
-                    except Exception:
-                        result_value = None
-
-                    condition_info = {
-                        "location": location,
-                        "raw": raw_condition,
-                        "context": list(pending_lines),
-                        "resolved": resolved_condition,
-                        "result": result_value,
-                        "test_id": current_test_id
-                    }
-
-                    current_conditions.append(condition_info)
-
-                pending_lines = []
-
-            elif current_test_id:
-                pending_lines.append(line)
-
-    return result
-
-def build_variable_values(context_lines):
-    """Build a dict of variable name -> value based on context."""
-    var_values = {}
-    for line in context_lines:
-        m = re.match(r'(.*?)\s*(==|!=)\s*(.*)', line)
-        if m:
-            var, op, val = m.groups()
-            var = var.strip()
-            val = val.strip()
-
-            if val == 'null':
-                val = 'None'
-
-            if op == '!=':
-                # if var != null → var = "notnull"
-                var_values[var] = '"notnull"'
-            else:
-                # if var == null → var = None
-                var_values[var] = 'None'
-            continue
-
-        m = re.match(r'(.*?)\s*=\s*(.*)', line)
-        if m:
-            var, val = m.groups()
-            var = var.strip()
-            val = val.strip()
-            if val == 'null':
-                val = 'None'
-            var_values[var] = val
-
-    return var_values
-
-def substitute_variables(expression, var_values):
-    """Replace variables in the expression based on the context mapping."""
-    resolved = expression
-    for var, val in var_values.items():
-        if isinstance(val, str) and val.startswith("NOT_"):
-            # special handling for "!="
-            real_val = val.replace("NOT_", "")
-            resolved = resolved.replace(var, f"({var} != {real_val})")
-        else:
-            resolved = resolved.replace(var, val)
-    return resolved
-
-def order_by_location(testblocks):
-    ordered = defaultdict(list)
-
-    for test_id, conditions in testblocks.items():
-        for condition in conditions:
-            loc = condition.pop('location')
-            ordered[loc].append(condition)
-
-    final_result = {}
-    for loc, conds in ordered.items():
-        test_ids = {cond['test_id'] for cond in conds}
-        results = {cond['result'] for cond in conds}
-
-        final_result[loc] = {
-            "testcases_cnt": len(test_ids),
-            "results": list(results),
-            "conditions": conds,
+    final_map = {}
+    for loc, data in location_map.items():
+        final_map[loc] = {
+            "exercised": {
+                "cnt": len(set(data["exercised"])),
+                "testcases": sorted(set(data["exercised"]))
+            },
+            "subconditions": {
+                idx: {
+                    "cnt": len(set(tests)),
+                    "testcases": sorted(set(tests))
+                }
+                for idx, tests in data["subconditions"].items()
+            }
         }
-    return final_result
+
+    with open(output_json_path, "w") as f:
+        json.dump(final_map, f, indent=2)
+
+def extract_between(text, start_token, end_token):
+    start_idx = text.find(start_token)
+    if start_idx == -1:
+        return ""
+    start_idx += len(start_token)
+    end_idx = text.find(end_token, start_idx)
+    if end_idx == -1:
+        return ""
+    return text[start_idx:end_idx]
+
+def main():
+    input_log = "/Users/yzhou29/git/trace/joda_time-2.10.3/coverage.log"
+    output_json = "location_based_coverage_final.json"
+    parse_coverage_log_better(input_log, output_json)
 
 if __name__ == "__main__":
-    input_log = "/Users/yzhou29/git/trace/joda_time-2.10.3/coverage.log"
-    output_json = "modeled_conditions.json"
-
-    testblocks = parse_test_blocks(input_log)
-    ordered_conditions = order_by_location(testblocks)
-
-    with open(output_json, "w") as f:
-        json.dump(ordered_conditions, f, indent=4)
-
-    print(f"✅ Processed and wrote output with evaluation to {output_json}")
+    main()

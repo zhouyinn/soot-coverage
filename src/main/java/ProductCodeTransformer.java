@@ -10,7 +10,7 @@ class LineCounter {
 
 public class ProductCodeTransformer extends BodyTransformer {
     private final Map<String, Set<Integer>> linesToInstrument;
-    private static final Set<Integer> linesLogged = new HashSet<>();
+    private static final Set<String> linesLogged = new HashSet<>();
     public ProductCodeTransformer(Map<String, Set<Integer>> linesToInstrument) {
         this.linesToInstrument = linesToInstrument;
     }
@@ -19,6 +19,7 @@ public class ProductCodeTransformer extends BodyTransformer {
     protected void internalTransform(Body body, String phase, Map<String, String> options) {
         String className = body.getMethod().getDeclaringClass().getName();
         String methodName = body.getMethod().getName();
+        String classFile = className + ".java";
         if (className.startsWith("Logger") || className.endsWith("Test") || methodName.equals("<clinit>")) return;
 
         System.out.println("Instrumenting: " + body.getMethod().getSignature());
@@ -41,16 +42,16 @@ public class ProductCodeTransformer extends BodyTransformer {
                         counter.currentLine = line;
                         counter.subconditionCounter = 1;
                     }
-
-                    if (!linesLogged.contains(line)) {
+                    String lineKey = classFile + ":" + line;
+                    if (!linesLogged.contains(lineKey)) {
                         insertLineExercisedLog(stmt, body.getUnits(), body, logMethod);
-                        linesLogged.add(line);
+                        linesLogged.add(lineKey);
                     }
 
                     if (stmt instanceof IfStmt) {
                         IfStmt ifStmt = (IfStmt) stmt;
 
-                        // 1. Insert SUBCONDITION_CHECKED log
+                        // 1. Insert SUBCONDITION_CHECKED log. Log → Evaluate condition
                         ConditionInstrumenter.insertSubconditionCheckedLog(counter.subconditionCounter, stmt, body.getUnits(), body, logMethod);
 
                         // 2. Instrument the condition
@@ -77,7 +78,7 @@ public class ProductCodeTransformer extends BodyTransformer {
     }
 
     private static void insertLineExercisedLog(Unit stmt, PatchingChain<Unit> units, Body body, SootMethod logMethod) {
-        String sourceFile = body.getMethod().getDeclaringClass().getShortName() + ".java"; // or add package if you want
+        String sourceFile = body.getMethod().getDeclaringClass().getName().replace('.', '/') + ".java";
         int line = stmt.getJavaSourceStartLineNumber();
         String message = "{\"event\":\"EXERCISED\",\"file\":\"" + sourceFile + "\",\"line\":\"" + line + "\"}";
         InvokeExpr invokeExpr = Jimple.v().newStaticInvokeExpr(

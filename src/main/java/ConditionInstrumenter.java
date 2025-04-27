@@ -83,7 +83,7 @@ public class ConditionInstrumenter {
 
     public static void insertSubconditionCheckedLog(int index, Unit anchor, Chain<Unit> units,
                                                     Body body, SootMethod logMethod) {
-        String sourceFile = body.getMethod().getDeclaringClass().getShortName() + ".java";
+        String sourceFile = body.getMethod().getDeclaringClass().getName().replace('.', '/') + ".java";
         int line = anchor.getJavaSourceStartLineNumber();
 
         String msg = String.format(
