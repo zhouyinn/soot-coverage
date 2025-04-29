@@ -165,6 +165,8 @@ public class ProductCodeTransformer extends BodyTransformer {
                     Value rightOp = assign.getRightOp();
 
                     // Check right-hand side (READ access)
+                    // Static field access, e.g., StaticFieldRef in Jimple
+                    // Instance field access, e.g., InstanceFieldRef in Jimple
                     if (rightOp instanceof StaticFieldRef || rightOp instanceof InstanceFieldRef) {
                         SootField field = rightOp instanceof StaticFieldRef
                                 ? ((StaticFieldRef) rightOp).getField()
