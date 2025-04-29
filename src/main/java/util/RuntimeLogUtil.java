@@ -158,4 +158,14 @@ public class RuntimeLogUtil {
 
         return strLocal;
     }
+
+    public static void insertFieldAccessLog(SootField field, Unit anchor, Chain<Unit> units, SootMethod logMethod) {
+        String message = String.format("{\"event\":\"FIELD_ACCESSED\",\"field\":\"%s\"}", field.getSignature());
+        InvokeExpr invokeExpr = Jimple.v().newStaticInvokeExpr(
+                logMethod.makeRef(),
+                StringConstant.v(message)
+        );
+        InvokeStmt logStmt = Jimple.v().newInvokeStmt(invokeExpr);
+        units.insertBefore(logStmt, anchor);
+    }
 }

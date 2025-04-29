@@ -15,20 +15,32 @@ class LineCounter {
 
 public class ProductCodeTransformer extends BodyTransformer {
     private final Map<String, Set<Integer>> linesToInstrument;
+    private final Map<String, Set<String>> fieldsToInstrument;
+
     private static final Set<String> linesLogged = new HashSet<>();
-    public ProductCodeTransformer(Map<String, Set<Integer>> linesToInstrument) {
+    public ProductCodeTransformer(Map<String, Set<Integer>> linesToInstrument, Map<String, Set<String>> fieldsToInstrument) {
         this.linesToInstrument = linesToInstrument;
+        this.fieldsToInstrument = fieldsToInstrument;
     }
 
     @Override
     protected void internalTransform(Body body, String phase, Map<String, String> options) {
         String className = body.getMethod().getDeclaringClass().getName();
         String methodName = body.getMethod().getName();
-        if (className.startsWith("Logger") || className.endsWith("Test") || methodName.equals("<clinit>") || methodName.equals("<init>")) return;
+        if (className.startsWith("Logger") || className.endsWith("Test") || methodName.equals("<init>")) return;
 
         System.out.println("Instrumenting: " + body.getMethod().getSignature());
 
         Set<Integer> allRequestedLines = findInstrumentedLines(className);
+        Set<String> fieldsToMonitor = findFieldSignatures(
+                body.getMethod().getDeclaringClass(),
+                body.getMethod().getDeclaringClass().getName()
+        );
+
+        SootMethod logMethod = Scene.v().getMethod("<Logger: void log(java.lang.String)>");
+
+        instrumentFieldAccesses(body, fieldsToMonitor, logMethod);
+
         if (allRequestedLines == null) return;
 
         // 1. Get actual lines inside this method
@@ -46,7 +58,6 @@ public class ProductCodeTransformer extends BodyTransformer {
 
         if (relevantLines.isEmpty()) return;
 
-        SootMethod logMethod = Scene.v().getMethod("<Logger: void log(java.lang.String)>");
         instrumentLineExercised(body, relevantLines, logMethod);
         instrumentConditions(body, relevantLines, logMethod);
     }
@@ -133,6 +144,39 @@ public class ProductCodeTransformer extends BodyTransformer {
                 .map(Map.Entry::getValue)
                 .findFirst()
                 .orElse(null);
+    }
+
+    public static Set<String> findFieldSignatures(SootClass klass, String className) {
+        return klass.getFields().stream()
+                .filter(f -> f.getDeclaringClass().getName().equals(className))
+                .map(f -> f.getDeclaringClass().getName() + "." + f.getName()) // Hello.CONSTANT
+                .collect(Collectors.toSet());
+    }
+
+    private void instrumentFieldAccesses(Body body, Set<String> fieldsToMonitor, SootMethod logMethod) {
+        PatchingChain<Unit> units = body.getUnits();
+        List<Unit> safeUnits = new ArrayList<>(units);
+
+        safeUnits.stream()
+                .filter(u -> u instanceof AssignStmt)
+                .map(u -> (AssignStmt) u)
+                .filter(assign -> {
+                    Value rightOp = assign.getRightOp();
+                    return (rightOp instanceof StaticFieldRef || rightOp instanceof InstanceFieldRef);
+                })
+                .forEach(assign -> {
+                    Value rightOp = assign.getRightOp();
+                    SootField field = rightOp instanceof StaticFieldRef
+                            ? ((StaticFieldRef) rightOp).getField()
+                            : ((InstanceFieldRef) rightOp).getField();
+
+                    String shortSignature = field.getDeclaringClass().getName() + "." + field.getName();
+
+                    if (fieldsToMonitor.contains(shortSignature)) {
+//                        System.out.println(">>> Matched access to field: " + shortSignature);
+                        RuntimeLogUtil.insertFieldAccessLog(field, assign, units, logMethod);
+                    }
+                });
     }
 
 }

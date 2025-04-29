@@ -27,7 +27,7 @@ cd "$ROOT_DIR/statement-coverage" || { echo "Project directory statement-coverag
 
 # Step 3: Run Maven exec:java with arguments
 echo "Running instrumented class generation"
-mvn clean compile exec:java -Dexec.args="$PROJECT_DIR $PROJECT_DIR/enforcing_statements.txt" 2>&1 | tee instrumented.log || { echo "Maven exec failed"; exit 1; }
+mvn clean compile exec:java -Dexec.args="$PROJECT_DIR $PROJECT_DIR/enforcing_statements.txt $PROJECT_DIR/monitored_fields.txt" 2>&1 | tee instrumented.log || { echo "Maven exec failed"; exit 1; }
 
 # Step 4: Sync classes
 echo "Syncing classes with sync-classes.sh"

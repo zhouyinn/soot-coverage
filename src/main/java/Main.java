@@ -5,7 +5,10 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class Main {
@@ -18,29 +21,36 @@ public class Main {
                 targetProject + "/target/test-classes";
     }
 
-    public static void main(String[] args) {
-        if (args.length < 2) {
-            System.err.println("Usage: java Main <target-maven-project-path> <file-with-lines-to-instrument>");
+    public static void main(String[] args) throws IOException {
+        if (args.length < 3) {
+            System.err.println("Usage: java Main <target-maven-project-path> <file-with-lines-to-instrument> <file-with-fields-to-instrument>");
             System.exit(1);
         }
 
+
         String targetProject = args[0];
         String fileWithLinesToInstrument = args[1];
+        String fileWithFieldsToInstrument = args[2];
 
         System.out.println(">> Instrumenting project at: " + targetProject);
 
+        // Read lines to instrument
         Map<String, Set<Integer>> linesToInstrument = readLinesFromFile(fileWithLinesToInstrument);
         System.out.println(">> Using file for specific lines to instrument: " + linesToInstrument.toString());
 
+        // Read fields to instrument
+        Map<String, Set<String>> fieldsToInstrument = readFieldsFromFile(fileWithFieldsToInstrument);
+        System.out.println(">> Using file for specific fields to instrument: " + fieldsToInstrument);
+
 
         //  Generate instrumented .class files
-        instrumentClasses(targetProject, "target/classes", "instrumented-classes", new ProductCodeTransformer(linesToInstrument), Options.output_format_class);
+        instrumentClasses(targetProject, "target/classes", "instrumented-classes", new ProductCodeTransformer(linesToInstrument, fieldsToInstrument), Options.output_format_class);
         G.reset();
         instrumentClasses(targetProject, "target/test-classes", "instrumented-test-classes", new TestCodeTransformer(), Options.output_format_class);
         G.reset();
 
         // Generate Jimple output
-        instrumentClasses(targetProject, "target/classes", "jimple-out", new ProductCodeTransformer(linesToInstrument), Options.output_format_jimple);
+        instrumentClasses(targetProject, "target/classes", "jimple-out", new ProductCodeTransformer(linesToInstrument, fieldsToInstrument), Options.output_format_jimple);
         G.reset();
         instrumentClasses(targetProject, "target/test-classes", "jimple-test-out", new TestCodeTransformer(), Options.output_format_jimple);
     }
@@ -77,6 +87,18 @@ public class Main {
             e.printStackTrace();
         }
         return linesMap;
+    }
+
+    private static Map<String, Set<String>> readFieldsFromFile(String filePath) throws IOException {
+        return Files.lines(Paths.get(filePath))
+                .map(String::trim)
+                .filter(line -> !line.isEmpty())
+                .map(line -> line.split("\\.", 2)) // Split into [ClassName, FieldName]
+                .filter(parts -> parts.length == 2)
+                .collect(Collectors.groupingBy(
+                        parts -> parts[0],                      // Class name (e.g., Hello, Foo)
+                        Collectors.mapping(parts -> parts[1], Collectors.toSet()) // Field names (e.g., CONSTANT, name)
+                ));
     }
 
     private static void instrumentClasses(String targetProjectPath, String inputSubdir, String outputSubdir, BodyTransformer transformer, int outputFormat) {
