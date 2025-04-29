@@ -1,6 +1,8 @@
 import soot.*;
 import soot.jimple.*;
 import soot.util.Chain;
+import util.RuntimeLogUtil;
+import util.TempVariableUtil;
 
 public class ConditionInstrumenter {
     public static Value instrument(Value cond, Unit anchor, Chain<Unit> units, Body body, SootMethod logMethod) {
@@ -17,13 +19,13 @@ public class ConditionInstrumenter {
 
     private static Value handleBinaryExpr(BinopExpr binop, Unit anchor, Chain<Unit> units, Body body, SootMethod logMethod) {
         // 1. create temp locals
-        Local left = InstrumentationUtil.createTempForValue(binop.getOp1(), "left", units, anchor, body, logMethod);
+        Local left = TempVariableUtil.createTempForValue(binop.getOp1(), "left", units, anchor, body, logMethod);
 
         // 3. create temp for right operand
-        Local right = InstrumentationUtil.createTempForValue(binop.getOp2(), "right", units, anchor, body, logMethod);
+        Local right = TempVariableUtil.createTempForValue(binop.getOp2(), "right", units, anchor, body, logMethod);
 
         // 4. log the full condition evaluation
-        insertConditionLog(left, right, binop.getSymbol(), units, anchor, logMethod, body);
+        RuntimeLogUtil.insertConditionLog(left, right, binop.getSymbol(), units, anchor, logMethod, body);
 
         // 5. rebuild the condition using the temps
         if (binop instanceof LtExpr) return Jimple.v().newLtExpr(left, right);
@@ -60,42 +62,4 @@ public class ConditionInstrumenter {
         }
     }
 
-    private static void insertConditionLog(Local left, Local right, String op,
-                                     Chain<Unit> units, Unit anchor,
-                                     SootMethod logMethod, Body body) {
-        if (!InstrumentationUtil.DEBUG_MODE) return;
-        if (left == null || right == null) return;
-        String className = body.getMethod().getDeclaringClass().getName().replace('.', '/');
-        int line = anchor.getJavaSourceStartLineNumber();
-
-        String msg = String.format(
-                "{\"event\":\"CONDITION\",\"file\":\"%s.java\",\"line\":\"%d\",\"OP_left\":\"%s\",\"operator\":\"%s\",\"OP_right\":\"%s\"}",
-                className, line, left.getName(), op, right.getName()
-        );
-
-        units.insertBefore(
-                Jimple.v().newInvokeStmt(
-                        Jimple.v().newStaticInvokeExpr(logMethod.makeRef(), StringConstant.v(msg))
-                ),
-                anchor
-        );
-    }
-
-    public static void insertSubconditionCheckedLog(int index, Unit anchor, Chain<Unit> units,
-                                                    Body body, SootMethod logMethod) {
-        String sourceFile = body.getMethod().getDeclaringClass().getName().replace('.', '/') + ".java";
-        int line = anchor.getJavaSourceStartLineNumber();
-
-        String msg = String.format(
-                "{\"event\":\"SUBCONDITION_CHECKED\",\"file\":\"%s\",\"line\":\"%d\",\"index\":%d}",
-                sourceFile, line, index
-        );
-
-        units.insertBefore(
-                Jimple.v().newInvokeStmt(
-                        Jimple.v().newStaticInvokeExpr(logMethod.makeRef(), StringConstant.v(msg))
-                ),
-                anchor
-        );
-    }
 }

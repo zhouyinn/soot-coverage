@@ -1,18 +1,12 @@
+package util;
+
 import soot.*;
-import soot.jimple.*;
-import soot.jimple.Jimple;
-import soot.jimple.StringConstant;
 import soot.toolkits.graph.UnitGraph;
-import soot.util.Chain;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 
-public class InstrumentationUtil {
-
-    public static boolean DEBUG_MODE = false; // true = verbose, false = minimal
-
+public class ControlFlowUtil {
 
     public static Unit findBestStmtUsingCPG(UnitGraph cfg, Map<Integer, List<Unit>> lineToStmts, int targetLine) {
         // 1. Try exact match first
@@ -71,6 +65,5 @@ public class InstrumentationUtil {
         }
         return false;
     }
-
 
 }
