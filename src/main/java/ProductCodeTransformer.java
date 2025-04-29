@@ -27,7 +27,7 @@ public class ProductCodeTransformer extends BodyTransformer {
     protected void internalTransform(Body body, String phase, Map<String, String> options) {
         String className = body.getMethod().getDeclaringClass().getName();
         String methodName = body.getMethod().getName();
-        if (className.startsWith("Logger") || className.endsWith("Test") || methodName.equals("<init>")) return;
+        if (className.startsWith("Logger") || className.endsWith("Test")) return;
 
         System.out.println("Instrumenting: " + body.getMethod().getSignature());
 
@@ -160,22 +160,33 @@ public class ProductCodeTransformer extends BodyTransformer {
         safeUnits.stream()
                 .filter(u -> u instanceof AssignStmt)
                 .map(u -> (AssignStmt) u)
-                .filter(assign -> {
-                    Value rightOp = assign.getRightOp();
-                    return (rightOp instanceof StaticFieldRef || rightOp instanceof InstanceFieldRef);
-                })
                 .forEach(assign -> {
+                    Value leftOp = assign.getLeftOp();
                     Value rightOp = assign.getRightOp();
-                    SootField field = rightOp instanceof StaticFieldRef
-                            ? ((StaticFieldRef) rightOp).getField()
-                            : ((InstanceFieldRef) rightOp).getField();
 
-                    String shortSignature = field.getDeclaringClass().getName() + "." + field.getName();
+                    // Check right-hand side (READ access)
+                    if (rightOp instanceof StaticFieldRef || rightOp instanceof InstanceFieldRef) {
+                        SootField field = rightOp instanceof StaticFieldRef
+                                ? ((StaticFieldRef) rightOp).getField()
+                                : ((InstanceFieldRef) rightOp).getField();
 
-                    if (fieldsToMonitor.contains(shortSignature)) {
-//                        System.out.println(">>> Matched access to field: " + shortSignature);
-                        RuntimeLogUtil.insertFieldAccessLog(field, assign, units, logMethod);
+                        String shortSignature = field.getDeclaringClass().getName() + "." + field.getName();
+                        if (fieldsToMonitor.contains(shortSignature)) {
+                            RuntimeLogUtil.insertFieldAccessLog(field, assign, units, logMethod);
+                        }
                     }
+
+//                    // Check left-hand side (WRITE access)
+//                    if (leftOp instanceof StaticFieldRef || leftOp instanceof InstanceFieldRef) {
+//                        SootField field = leftOp instanceof StaticFieldRef
+//                                ? ((StaticFieldRef) leftOp).getField()
+//                                : ((InstanceFieldRef) leftOp).getField();
+//
+//                        String shortSignature = field.getDeclaringClass().getName() + "." + field.getName();
+//                        if (fieldsToMonitor.contains(shortSignature)) {
+//                            RuntimeLogUtil.insertFieldAccessLog(field, assign, units, logMethod);
+//                        }
+//                    }
                 });
     }
 
