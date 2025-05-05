@@ -23,7 +23,7 @@ cd "$PROJECT_DIR" || { echo "Project directory '$PROJECT_DIR' not found"; exit 1
 echo "Running mvn clean compile test-compile"
 mvn clean compile test-compile || { echo "Maven compile failed"; exit 1; }
 
-cd "$ROOT_DIR/statement-coverage" || { echo "Project directory statement-coverage not found"; exit 1; }
+cd "$ROOT_DIR/soot-instrument" || { echo "Project directory soot-instrument not found"; exit 1; }
 
 # Step 3: Run Maven exec:java with arguments
 echo "Running instrumented class generation"

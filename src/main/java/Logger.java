@@ -21,13 +21,13 @@ public class Logger {
 
     public static void log(String id) {
         synchronized (logsThisTestCase) {
-            if (id.contains("\"event\":\"SUBCONDITION_CHECKED\"")) {
+            if (id.contains("event: SUBCONDITION_CHECKED")) {
                 String key = extractSubconditionKey(id);  // file + line + index
                 if (seenSubconditions.contains(key)) {
                     return; // already logged this exact subcondition
                 }
                 seenSubconditions.add(key);
-            } else if (id.contains("\"event\":\"EXERCISED\"")) {
+            } else if (id.contains("event: EXERCISED")) {
                 String key = extractLineKey(id);  // file + line only
                 if (seenLines.contains(key)) {
                     return; // already logged this line executed

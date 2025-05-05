@@ -13,7 +13,7 @@ import java.util.stream.IntStream;
 
 public class Main {
 //    static String rtJar = "/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/jre/lib/rt.jar";
-    static String sootRuntime = "target/classes";
+    static String sootRuntime = System.getenv().getOrDefault("SOOT_RUNTIME_CLASSES", "target/classes");
 
     static String getFullClassPath(String targetProject) {
         return sootRuntime + ":" +
@@ -31,6 +31,12 @@ public class Main {
         String targetProject = args[0];
         String fileWithLinesToInstrument = args[1];
         String fileWithFieldsToInstrument = args[2];
+        String sootRuntime = args.length >= 4 ? args[3] : "target/classes";
+
+        String classpath = sootRuntime + ":" +
+                targetProject + "/target/classes:" +
+                targetProject + "/target/test-classes";
+        Options.v().set_soot_classpath(classpath);
 
         System.out.println(">> Instrumenting project at: " + targetProject);
 

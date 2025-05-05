@@ -39,7 +39,7 @@ public class ProductCodeTransformer extends BodyTransformer {
 
         SootMethod logMethod = Scene.v().getMethod("<Logger: void log(java.lang.String)>");
 
-        instrumentFieldAccesses(body, fieldsToMonitor, logMethod);
+//        instrumentFieldAccesses(body, fieldsToMonitor, logMethod);
 
         if (allRequestedLines == null) return;
 
@@ -58,8 +58,8 @@ public class ProductCodeTransformer extends BodyTransformer {
 
         if (relevantLines.isEmpty()) return;
 
-        instrumentLineExercised(body, relevantLines, logMethod);
         instrumentConditions(body, relevantLines, logMethod);
+        instrumentLineExercised(body, relevantLines, logMethod); // to figure out why need to instrument condition before line
     }
 
     private void instrumentConditions(Body body, Set<Integer> linesToProcess, SootMethod logMethod) {
@@ -113,16 +113,16 @@ public class ProductCodeTransformer extends BodyTransformer {
 
         linesToProcess.stream()
                 .map(line -> new AbstractMap.SimpleEntry<>(line, ControlFlowUtil.findBestStmtUsingCPG(cfg, lineToStmts, line)))
-//                .peek(entry -> {
-//                    int line = entry.getKey();
-//                    Unit bestStmt = entry.getValue();
-//                    if (bestStmt != null) {
-//                        int actualLine = bestStmt.getJavaSourceStartLineNumber();
-//                        System.out.println("[Instrumentation] Requested line " + line + ", found best Unit at line " + actualLine);
-//                    } else {
-//                        System.out.println("[Instrumentation] Requested line " + line + ", but no reachable Unit found!");
-//                    }
-//                })
+                .peek(entry -> {
+                    int line = entry.getKey();
+                    Unit bestStmt = entry.getValue();
+                    if (bestStmt != null) {
+                        int actualLine = bestStmt.getJavaSourceStartLineNumber();
+                        System.out.println("[Instrumentation] Requested line " + line + ", found best Unit at line " + actualLine);
+                    } else {
+                        System.out.println("[Instrumentation] Requested line " + line + ", but no reachable Unit found!");
+                    }
+                })
                 .filter(entry -> entry.getValue() != null)
                 .filter(entry -> {
                     String lineKey = classFile + ":" + entry.getKey();
