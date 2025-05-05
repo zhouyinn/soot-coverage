@@ -9,7 +9,7 @@ public class RuntimeLogUtil {
 
     public static void insertLineExercisedLog(Unit anchorStmt, PatchingChain<Unit> units, String sourceFile, int line, SootMethod logMethod) {
 //        System.out.println("Inserting line exercised log for " + sourceFile);
-        String message = "{\"event\":\"EXERCISED\",\"file\":\"" + sourceFile + "\",\"line\":\"" + line + "\"}";
+        String message = "{event: EXERCISED, file: " + sourceFile + ", line: " + line + "}";
         InvokeExpr invokeExpr = Jimple.v().newStaticInvokeExpr(
                 logMethod.makeRef(),
                 StringConstant.v(message)
@@ -27,7 +27,7 @@ public class RuntimeLogUtil {
         int line = anchor.getJavaSourceStartLineNumber();
 
         String msg = String.format(
-                "{\"event\":\"CONDITION\",\"file\":\"%s.java\",\"line\":\"%d\",\"OP_left\":\"%s\",\"operator\":\"%s\",\"OP_right\":\"%s\"}",
+                "{event: CONDITION, file: %s.java, line: %d, OP_left: %s, operator: %s, OP_right: %s}"
                 className, line, left.getName(), op, right.getName()
         );
 
@@ -45,7 +45,7 @@ public class RuntimeLogUtil {
         int line = anchor.getJavaSourceStartLineNumber();
 
         String msg = String.format(
-                "{\"event\":\"SUBCONDITION_CHECKED\",\"file\":\"%s\",\"line\":\"%d\",\"index\":%d}",
+                "{event: SUBCONDITION_CHECKED, file: %s, line: %d, index: %d}",
                 sourceFile, line, index
         );
 
@@ -87,7 +87,7 @@ public class RuntimeLogUtil {
         } else {
             // Fallback for unsupported types
             Local fallbackStr = createStringLocal(
-                    "{\"event\":\"VAR\",\"name\":\"" + local.getName() + "\",\"value\":\"[unsupported type]\"}",
+                    "{event: VAR, name: " + local.getName() + ", value: [unsupported type]}",
                     units, anchor, body
             );
 
@@ -160,7 +160,7 @@ public class RuntimeLogUtil {
     }
 
     public static void insertFieldAccessLog(SootField field, Unit anchor, Chain<Unit> units, SootMethod logMethod) {
-        String message = String.format("{\"event\":\"FIELD_ACCESSED\",\"field\":\"%s\"}", field.getSignature());
+        String message = String.format("{event: FIELD_ACCESSED, field: %s}", field.getSignature());
         InvokeExpr invokeExpr = Jimple.v().newStaticInvokeExpr(
                 logMethod.makeRef(),
                 StringConstant.v(message)
