@@ -6,13 +6,14 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class Main {
-//    static String rtJar = "/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/jre/lib/rt.jar";
+
     static String sootRuntime = System.getenv().getOrDefault("SOOT_RUNTIME_CLASSES", "target/classes");
 
     static String getFullClassPath(String targetProject) {
@@ -26,7 +27,6 @@ public class Main {
             System.err.println("Usage: java Main <target-maven-project-path> <file-with-lines-to-instrument> <file-with-fields-to-instrument>");
             System.exit(1);
         }
-
 
         String targetProject = args[0];
         String fileWithLinesToInstrument = args[1];
@@ -48,17 +48,53 @@ public class Main {
         Map<String, Set<String>> fieldsToInstrument = readFieldsFromFile(fileWithFieldsToInstrument);
         System.out.println(">> Using file for specific fields to instrument: " + fieldsToInstrument);
 
+        // --- Instrument product classes ---
+        List<BodyTransformer> productTransformers = Arrays.asList(
+                new ExercisedLineTransformer(linesToInstrument)
+//                new ConditionTransformer(linesToInstrument)
+                // You can add FieldAccessTransformer(fieldsToInstrument) here if needed
+        );
 
-        //  Generate instrumented .class files
-        instrumentClasses(targetProject, "target/classes", "instrumented-classes", new ProductCodeTransformer(linesToInstrument, fieldsToInstrument), Options.output_format_class);
-        G.reset();
-        instrumentClasses(targetProject, "target/test-classes", "instrumented-test-classes", new TestCodeTransformer(), Options.output_format_class);
+        instrumentClasses(
+                targetProject,
+                "target/classes",
+                "instrumented-classes",
+                productTransformers,
+                Options.output_format_class
+        );
+
         G.reset();
 
-        // Generate Jimple output
-        instrumentClasses(targetProject, "target/classes", "jimple-out", new ProductCodeTransformer(linesToInstrument, fieldsToInstrument), Options.output_format_jimple);
+        // --- Instrument test classes ---
+        instrumentClasses(
+                targetProject,
+                "target/test-classes",
+                "instrumented-test-classes",
+                Collections.singletonList(new TestCodeTransformer()),
+                Options.output_format_class
+        );
+
         G.reset();
-        instrumentClasses(targetProject, "target/test-classes", "jimple-test-out", new TestCodeTransformer(), Options.output_format_jimple);
+
+        // --- Generate Jimple output for product classes ---
+        instrumentClasses(
+                targetProject,
+                "target/classes",
+                "jimple-out",
+                productTransformers,
+                Options.output_format_jimple
+        );
+
+        G.reset();
+
+        // --- Generate Jimple output for test classes ---
+        instrumentClasses(
+                targetProject,
+                "target/test-classes",
+                "jimple-test-out",
+                Collections.singletonList(new TestCodeTransformer()),
+                Options.output_format_jimple
+        );
     }
 
     static Map<String, Set<Integer>> readLinesFromFile(String fileWithLinesToInstrument) {
@@ -67,6 +103,7 @@ public class Main {
             String line;
             while ((line = br.readLine()) != null) {
                 String[] parts = line.split(":");
+                if (parts.length != 2) continue;
                 String filePath = parts[0].trim();
                 String[] lineNumbers = parts[1].trim().split(",");
                 Set<Integer> lineSet = new HashSet<>();
@@ -95,19 +132,37 @@ public class Main {
         return linesMap;
     }
 
-    private static Map<String, Set<String>> readFieldsFromFile(String filePath) throws IOException {
-        return Files.lines(Paths.get(filePath))
-                .map(String::trim)
-                .filter(line -> !line.isEmpty())
-                .map(line -> line.split("\\.", 2)) // Split into [ClassName, FieldName]
-                .filter(parts -> parts.length == 2)
-                .collect(Collectors.groupingBy(
-                        parts -> parts[0],                      // Class name (e.g., Hello, Foo)
-                        Collectors.mapping(parts -> parts[1], Collectors.toSet()) // Field names (e.g., CONSTANT, name)
-                ));
+    private static Map<String, Set<String>> readFieldsFromFile(String filePath) {
+        Path path = Paths.get(filePath);
+
+        if (!Files.exists(path)) {
+            System.out.println("⚠️ Fields file not found: " + filePath + " (returning empty map)");
+            return Collections.emptyMap();
+        }
+
+        try {
+            return Files.lines(path)
+                    .map(String::trim)
+                    .filter(line -> !line.isEmpty())
+                    .map(line -> line.split("\\.", 2)) // Split into [ClassName, FieldName]
+                    .filter(parts -> parts.length == 2)
+                    .collect(Collectors.groupingBy(
+                            parts -> parts[0],                      // Class name (e.g., Hello, Foo)
+                            Collectors.mapping(parts -> parts[1], Collectors.toSet()) // Field names (e.g., CONSTANT, name)
+                    ));
+        } catch (IOException e) {
+            System.out.println("⚠️ Error reading file: " + filePath + " (returning empty map)");
+            return Collections.emptyMap();
+        }
     }
 
-    private static void instrumentClasses(String targetProjectPath, String inputSubdir, String outputSubdir, BodyTransformer transformer, int outputFormat) {
+    private static void instrumentClasses(
+            String targetProjectPath,
+            String inputSubdir,
+            String outputSubdir,
+            List<BodyTransformer> transformers,
+            int outputFormat
+    ) {
         String inputDir = targetProjectPath + "/" + inputSubdir;
         String outputDir = targetProjectPath + "/" + outputSubdir;
         String fullClasspath = getFullClassPath(targetProjectPath);
@@ -138,8 +193,12 @@ public class Main {
         Options.v().set_no_bodies_for_excluded(true);
         Options.v().set_include_all(true);
 
-        // Register transformer
-        PackManager.v().getPack("jtp").add(new Transform("jtp.instrument", transformer));
+        // Register all transformers
+        for (BodyTransformer transformer : transformers) {
+            String name = transformer.getClass().getSimpleName();
+            PackManager.v().getPack("jtp").add(new Transform("jtp." + name, transformer));
+        }
+
         // Load classes
         Scene.v().loadNecessaryClasses();
 
@@ -153,5 +212,4 @@ public class Main {
         PackManager.v().runPacks();
         PackManager.v().writeOutput();
     }
-
 }

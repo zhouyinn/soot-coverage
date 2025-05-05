@@ -25,6 +25,8 @@ mvn clean compile test-compile || { echo "Maven compile failed"; exit 1; }
 
 cd "$ROOT_DIR/soot-instrument" || { echo "Project directory soot-instrument not found"; exit 1; }
 
+cp Logger.class $PROJECT_DIR/target/classes
+
 # Step 3: Run Maven exec:java with arguments
 echo "Running instrumented class generation"
 mvn clean compile exec:java -Dexec.args="$PROJECT_DIR $PROJECT_DIR/enforcing_statements.txt $PROJECT_DIR/monitored_fields.txt" 2>&1 | tee instrumented.log || { echo "Maven exec failed"; exit 1; }

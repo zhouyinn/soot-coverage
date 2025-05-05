@@ -13,7 +13,7 @@ SRC_CLASSES="$PROJ/instrumented-classes"
 SRC_TEST_CLASSES="$PROJ/instrumented-test-classes"
 DST_CLASSES="$PROJ/target/classes"
 DST_TEST_CLASSES="$PROJ/target/test-classes"
-LOGGER_CLASS="../statement-coverage/target/classes/Logger.class"
+LOGGER_CLASS="../soot-instrument/target/classes/Logger.class"
 
 # Function to copy matching .class files only
 copy_matching_classes() {
