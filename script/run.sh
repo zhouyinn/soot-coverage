@@ -29,8 +29,13 @@ cp Logger.class $PROJECT_DIR/target/classes
 
 # Step 3: Run Maven exec:java with arguments
 echo "Running instrumented class generation"
-mvn clean compile exec:java -Dexec.args="$PROJECT_DIR $PROJECT_DIR/enforcing_statements.txt $PROJECT_DIR/monitored_fields.txt" 2>&1 | tee instrumented.log || { echo "Maven exec failed"; exit 1; }
+# First: overwrite (for Jimple mode)
+mvn clean compile exec:java -Dexec.args="$PROJECT_DIR $PROJECT_DIR/enforcing_statements.txt $PROJECT_DIR/monitored_fields.txt jimple" \
+    2>&1 | tee instrumented.log || { echo "Maven exec failed"; exit 1; }
 
+# Second: append (for Class mode)
+mvn exec:java -Dexec.args="$PROJECT_DIR $PROJECT_DIR/enforcing_statements.txt $PROJECT_DIR/monitored_fields.txt" \
+    2>&1 | tee -a instrumented.log || { echo "Maven exec failed"; exit 1; }
 # Step 4: Sync classes
 echo "Syncing classes with sync-classes.sh"
 bash script/sync-classes.sh "$PROJECT_DIR" || { echo "Failed to sync classes"; exit 1; }

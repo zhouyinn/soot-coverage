@@ -24,14 +24,22 @@ public class Main {
 
     public static void main(String[] args) throws IOException {
         if (args.length < 3) {
-            System.err.println("Usage: java Main <target-maven-project-path> <file-with-lines-to-instrument> <file-with-fields-to-instrument>");
+            System.err.println("Usage: java Main <target-maven-project-path> <file-with-lines-to-instrument> <file-with-fields-to-instrument> [mode: jimple|class]");
             System.exit(1);
         }
 
         String targetProject = args[0];
         String fileWithLinesToInstrument = args[1];
         String fileWithFieldsToInstrument = args[2];
-        String sootRuntime = args.length >= 4 ? args[3] : "target/classes";
+
+        // Optional 4th arg: mode (default: class)
+        String mode = (args.length >= 4) ? args[3].toLowerCase() : "class";
+        if (!mode.equals("jimple") && !mode.equals("class")) {
+            System.err.println("Invalid mode: " + mode + ". Expected 'jimple' or 'class'.");
+            System.exit(1);
+        }
+
+        int outputFormat = mode.equals("jimple") ? Options.output_format_jimple : Options.output_format_class;
 
         String classpath = sootRuntime + ":" +
                 targetProject + "/target/classes:" +
@@ -39,10 +47,11 @@ public class Main {
         Options.v().set_soot_classpath(classpath);
 
         System.out.println(">> Instrumenting project at: " + targetProject);
+        System.out.println(">> Mode: " + mode + " (output format: " + (mode.equals("jimple") ? "Jimple" : "Class files") + ")");
 
         // Read lines to instrument
         Map<String, Set<Integer>> linesToInstrument = readLinesFromFile(fileWithLinesToInstrument);
-        System.out.println(">> Using file for specific lines to instrument: " + linesToInstrument.toString());
+        System.out.println(">> Using file for specific lines to instrument: " + linesToInstrument);
 
         // Read fields to instrument
         Map<String, Set<String>> fieldsToInstrument = readFieldsFromFile(fileWithFieldsToInstrument);
@@ -50,17 +59,17 @@ public class Main {
 
         // --- Instrument product classes ---
         List<BodyTransformer> productTransformers = Arrays.asList(
-                new ExercisedLineTransformer(linesToInstrument)
-//                new ConditionTransformer(linesToInstrument)
-                // You can add FieldAccessTransformer(fieldsToInstrument) here if needed
+                new ExercisedLineTransformer(linesToInstrument),
+                new ConditionTransformer(linesToInstrument)
+                // Optionally: new FieldAccessTransformer(fieldsToInstrument)
         );
 
         instrumentClasses(
                 targetProject,
                 "target/classes",
-                "instrumented-classes",
+                mode.equals("jimple") ? "jimple-out" : "instrumented-classes",
                 productTransformers,
-                Options.output_format_class
+                outputFormat
         );
 
         G.reset();
@@ -69,31 +78,9 @@ public class Main {
         instrumentClasses(
                 targetProject,
                 "target/test-classes",
-                "instrumented-test-classes",
+                mode.equals("jimple") ? "jimple-test-out" : "instrumented-test-classes",
                 Collections.singletonList(new TestCodeTransformer()),
-                Options.output_format_class
-        );
-
-        G.reset();
-
-        // --- Generate Jimple output for product classes ---
-        instrumentClasses(
-                targetProject,
-                "target/classes",
-                "jimple-out",
-                productTransformers,
-                Options.output_format_jimple
-        );
-
-        G.reset();
-
-        // --- Generate Jimple output for test classes ---
-        instrumentClasses(
-                targetProject,
-                "target/test-classes",
-                "jimple-test-out",
-                Collections.singletonList(new TestCodeTransformer()),
-                Options.output_format_jimple
+                outputFormat
         );
     }
 
