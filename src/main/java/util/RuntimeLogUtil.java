@@ -113,11 +113,11 @@ public class RuntimeLogUtil {
                                       Chain<Unit> units, Unit anchor, Body body) {
         // Build: {"event":"eventType","name":"varName","type":"typeName","source":"sourceType","value":
         Local prefix = createStringLocal(
-                "{\"event\":\"" + eventType +
-                        "\",\"name\":\"" + varName +
-                        "\",\"type\":\"" + typeName +
-                        "\",\"source\":\"" + sourceType +
-                        "\",\"value\":\"",
+                "{event: " + eventType +
+                        ", name: " + varName +
+                        ", type: " + typeName +
+                        ", source: " + sourceType +
+                        ", value: ",
                 units, anchor, body
         );
 
