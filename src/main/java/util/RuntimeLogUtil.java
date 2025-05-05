@@ -27,7 +27,7 @@ public class RuntimeLogUtil {
         int line = anchor.getJavaSourceStartLineNumber();
 
         String msg = String.format(
-                "{event: CONDITION, file: %s.java, line: %d, OP_left: %s, operator: %s, OP_right: %s}"
+                "{event: CONDITION, file: %s.java, line: %d, OP_left: %s, operator: %s, OP_right: %s}",
                 className, line, left.getName(), op, right.getName()
         );
 
