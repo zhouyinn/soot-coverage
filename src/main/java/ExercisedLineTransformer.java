@@ -91,7 +91,7 @@ public class ExercisedLineTransformer extends BodyTransformer {
                     int line = entry.getKey();
                     Unit bestStmt = entry.getValue();
                     String lineKey = classFile + ":" + line;
-                    RuntimeLogUtil.insertLineExercisedLog(bestStmt, units, classFile, line, logMethod);
+                    RuntimeLogUtil.insertLineExercisedLog(bestStmt, units, classFile.replace('.', '/'), line, logMethod);
                     linesLogged.add(lineKey);
                 });
     }
