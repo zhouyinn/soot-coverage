@@ -1,13 +1,8 @@
 import soot.*;
 import soot.options.Options;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.*;
+import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -16,19 +11,19 @@ public class Main {
 
     static String sootRuntime = System.getenv().getOrDefault("SOOT_RUNTIME_CLASSES", "target/classes");
 
-    static String getFullClassPath(String targetProject) {
+    static String getFullClassPath(String modulePath) {
         return sootRuntime + ":" +
-                targetProject + "/target/classes:" +
-                targetProject + "/target/test-classes";
+                modulePath + "/target/classes:" +
+                modulePath + "/target/test-classes";
     }
 
     public static void main(String[] args) throws IOException {
         if (args.length < 3) {
-            System.err.println("Usage: java Main <target-maven-project-path> <file-with-lines-to-instrument> <file-with-fields-to-instrument> [mode: jimple|class]");
+            System.err.println("Usage: java Main <target-project-root> <file-with-lines-to-instrument> <file-with-fields-to-instrument> [mode: jimple|class]");
             System.exit(1);
         }
 
-        String targetProject = args[0];
+        String rootProject = args[0];
         String fileWithLinesToInstrument = args[1];
         String fileWithFieldsToInstrument = args[2];
 
@@ -41,12 +36,7 @@ public class Main {
 
         int outputFormat = mode.equals("jimple") ? Options.output_format_jimple : Options.output_format_class;
 
-        String classpath = sootRuntime + ":" +
-                targetProject + "/target/classes:" +
-                targetProject + "/target/test-classes";
-        Options.v().set_soot_classpath(classpath);
-
-        System.out.println(">> Instrumenting project at: " + targetProject);
+        System.out.println(">> Instrumenting project at: " + rootProject);
         System.out.println(">> Mode: " + mode + " (output format: " + (mode.equals("jimple") ? "Jimple" : "Class files") + ")");
 
         // Read lines to instrument
@@ -57,31 +47,54 @@ public class Main {
         Map<String, Set<String>> fieldsToInstrument = readFieldsFromFile(fileWithFieldsToInstrument);
         System.out.println(">> Using file for specific fields to instrument: " + fieldsToInstrument);
 
-        // --- Instrument product classes ---
-        List<BodyTransformer> productTransformers = Arrays.asList(
-                new ExercisedLineTransformer(linesToInstrument),
-                new ConditionTransformer(linesToInstrument)
-                // Optionally: new FieldAccessTransformer(fieldsToInstrument)
-        );
+        // Find all modules (folders with pom.xml and src/)
+        List<File> moduleDirs = Files.list(Paths.get(rootProject))
+                .filter(Files::isDirectory)
+                .map(Path::toFile)
+                .filter(dir -> new File(dir, "pom.xml").exists() && new File(dir, "src").exists())
+                .collect(Collectors.toList());
 
-        instrumentClasses(
-                targetProject,
-                "target/classes",
-                mode.equals("jimple") ? "jimple-out" : "instrumented-classes",
-                productTransformers,
-                outputFormat
-        );
+        // If no modules found, treat root as a single module
+        if (moduleDirs.isEmpty()) {
+            moduleDirs = Collections.singletonList(new File(rootProject));
+        }
 
-        G.reset();
+        // Process each module
+        for (File moduleDir : moduleDirs) {
+            System.out.println("\n===============================");
+            System.out.println("🔎 Processing module: " + moduleDir.getName());
 
-        // --- Instrument test classes ---
-        instrumentClasses(
-                targetProject,
-                "target/test-classes",
-                mode.equals("jimple") ? "jimple-test-out" : "instrumented-test-classes",
-                Collections.singletonList(new TestCodeTransformer()),
-                outputFormat
-        );
+            String modulePath = moduleDir.getAbsolutePath();
+
+            List<BodyTransformer> productTransformers = Arrays.asList(
+                    new ExercisedLineTransformer(linesToInstrument),
+                    new ConditionTransformer(linesToInstrument)
+            );
+
+            // --- Product classes ---
+            instrumentClasses(
+                    modulePath,
+                    "target/classes",
+                    mode.equals("jimple") ? "jimple-out" : "instrumented-classes",
+                    productTransformers,
+                    outputFormat
+            );
+
+            G.reset();
+
+            // --- Test classes ---
+            instrumentClasses(
+                    modulePath,
+                    "target/test-classes",
+                    mode.equals("jimple") ? "jimple-test-out" : "instrumented-test-classes",
+                    Collections.singletonList(new TestCodeTransformer()),
+                    outputFormat
+            );
+
+            G.reset();
+        }
+
+        System.out.println("\n✅ All modules processed.");
     }
 
     static Map<String, Set<Integer>> readLinesFromFile(String fileWithLinesToInstrument) {
@@ -131,11 +144,11 @@ public class Main {
             return Files.lines(path)
                     .map(String::trim)
                     .filter(line -> !line.isEmpty())
-                    .map(line -> line.split("\\.", 2)) // Split into [ClassName, FieldName]
+                    .map(line -> line.split("\\.", 2))
                     .filter(parts -> parts.length == 2)
                     .collect(Collectors.groupingBy(
-                            parts -> parts[0],                      // Class name (e.g., Hello, Foo)
-                            Collectors.mapping(parts -> parts[1], Collectors.toSet()) // Field names (e.g., CONSTANT, name)
+                            parts -> parts[0],
+                            Collectors.mapping(parts -> parts[1], Collectors.toSet())
                     ));
         } catch (IOException e) {
             System.out.println("⚠️ Error reading file: " + filePath + " (returning empty map)");
@@ -144,15 +157,15 @@ public class Main {
     }
 
     private static void instrumentClasses(
-            String targetProjectPath,
+            String modulePath,
             String inputSubdir,
             String outputSubdir,
             List<BodyTransformer> transformers,
             int outputFormat
     ) {
-        String inputDir = targetProjectPath + "/" + inputSubdir;
-        String outputDir = targetProjectPath + "/" + outputSubdir;
-        String fullClasspath = getFullClassPath(targetProjectPath);
+        String inputDir = modulePath + "/" + inputSubdir;
+        String outputDir = modulePath + "/" + outputSubdir;
+        String fullClasspath = getFullClassPath(modulePath);
 
         System.out.println(">>> Processing: " + inputDir);
         System.out.println(">>> Output to: " + outputDir);
@@ -164,7 +177,7 @@ public class Main {
             return;
         }
 
-        G.reset(); // Reset for each run
+        G.reset(); // Reset Soot
 
         // Configure Soot
         Options.v().set_prepend_classpath(true);
@@ -180,22 +193,19 @@ public class Main {
         Options.v().set_no_bodies_for_excluded(true);
         Options.v().set_include_all(true);
 
-        // Register all transformers
+        // Register transformers
         for (BodyTransformer transformer : transformers) {
             String name = transformer.getClass().getSimpleName();
             PackManager.v().getPack("jtp").add(new Transform("jtp." + name, transformer));
         }
 
-        // Load classes
         Scene.v().loadNecessaryClasses();
 
-        // Debug print
         System.out.println("=== Classes loaded by Soot ===");
         Scene.v().getApplicationClasses().stream()
                 .map(SootClass::getName)
                 .forEach(name -> System.out.println("  " + name));
 
-        // Run Soot and write output
         PackManager.v().runPacks();
         PackManager.v().writeOutput();
     }

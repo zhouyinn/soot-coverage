@@ -21,9 +21,6 @@ public class ConditionTransformer extends BodyTransformer {
         if (className.startsWith("Logger") || className.endsWith("Test")) {
             return;
         }
-
-        System.out.println("🔧 Instrumenting CONDITIONS in: " + body.getMethod().getSignature());
-
         Set<Integer> requestedLines = findInstrumentedLines(className);
         if (requestedLines == null || requestedLines.isEmpty()) {
             return;
