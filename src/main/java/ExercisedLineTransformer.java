@@ -67,7 +67,7 @@ public class ExercisedLineTransformer extends BodyTransformer {
                     lineToStmts.computeIfAbsent(line, k -> new ArrayList<>()).add(unit);
                 });
 
-        String classFile = body.getMethod().getDeclaringClass().getName() + ".java";
+        String classFile = body.getMethod().getDeclaringClass().getName().replace('.', '/') + ".java";
         SootMethod logMethod = Scene.v().getMethod("<Logger: void log(java.lang.String)>");
 
         linesToProcess.stream()
@@ -91,7 +91,7 @@ public class ExercisedLineTransformer extends BodyTransformer {
                     int line = entry.getKey();
                     Unit bestStmt = entry.getValue();
                     String lineKey = classFile + ":" + line;
-                    RuntimeLogUtil.insertLineExercisedLog(bestStmt, units, classFile.replace('.', '/'), line, logMethod);
+                    RuntimeLogUtil.insertLineExercisedLog(bestStmt, units, classFile, line, logMethod);
                     linesLogged.add(lineKey);
                 });
     }
