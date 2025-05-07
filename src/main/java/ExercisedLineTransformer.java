@@ -24,7 +24,7 @@ public class ExercisedLineTransformer extends BodyTransformer {
         // Skip Logger or Test classes
         if (className.startsWith("Logger") || className.endsWith("Test")) return;
 
-        System.out.println("Instrumenting EXERCISED lines in: " + body.getMethod().getSignature());
+        System.out.println("Instrumenting EXERCISED in: " + body.getMethod().getSignature());
 
         Set<Integer> requestedLines = findInstrumentedLines(className);
         if (requestedLines == null || requestedLines.isEmpty()) return;
